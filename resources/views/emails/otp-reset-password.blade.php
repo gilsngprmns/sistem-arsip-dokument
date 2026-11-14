@@ -110,7 +110,7 @@
             <div class="otp-box">
                 <span class="otp-code">{{ $otp }}</span>
             </div>
-            <p class="expired">Kode ini berlaku selama 60 menit.</p>
+            <p class="expired">Kode ini berlaku selama 3 menit.</p>
             <div class="warning">
                 <strong>Perhatian:</strong> Jika Anda tidak melakukan permintaan ini, abaikan email ini.
                 Jangan bagikan kode ini kepada siapapun.

@@ -1,12 +1,13 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
+import AppIcon from '@/Components/AppIcon.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import { Head, useForm, usePage, router } from '@inertiajs/vue3';
 import { computed, ref, watch } from 'vue';
 
-defineProps({
+const props = defineProps({
     totalArsip: {
         type: Number,
         default: 0,
@@ -18,6 +19,14 @@ defineProps({
     daftarBackup: {
         type: Array,
         default: () => [],
+    },
+    limit: {
+        type: Number,
+        default: 10,
+    },
+    adaLebihLama: {
+        type: Boolean,
+        default: false,
     },
     cadanganTerakhir: {
         type: Object,
@@ -61,6 +70,54 @@ const formatWaktu = (iso) => {
 const showConfirm = ref(false);
 const running = ref(false);
 const selectedName = ref('');
+const selectedIds = ref([]);
+const showBulkDeleteModal = ref(false);
+
+const isAllSelected = computed(() =>
+    props.daftarBackup.length > 0 &&
+    selectedIds.value.length === props.daftarBackup.length,
+);
+
+const toggleRow = (namaFile) => {
+    const idx = selectedIds.value.indexOf(namaFile);
+    if (idx === -1) {
+        selectedIds.value.push(namaFile);
+    } else {
+        selectedIds.value.splice(idx, 1);
+    }
+};
+
+const onRowCheckboxChange = (event, namaFile) => {
+    toggleRow(namaFile);
+    event.target.checked = selectedIds.value.includes(namaFile);
+};
+
+const onHeaderCheckboxChange = (event) => {
+    if (event.target.checked) {
+        selectedIds.value = props.daftarBackup.map((b) => b.nama_file);
+    } else {
+        selectedIds.value = [];
+    }
+    event.target.indeterminate = false;
+};
+
+const bulkDelete = () => {
+    showBulkDeleteModal.value = true;
+};
+
+const confirmBulkDelete = () => {
+    router.post(
+        route('backup.destroy-bulk'),
+        { files: selectedIds.value },
+        {
+            preserveScroll: true,
+            onSuccess: () => {
+                showBulkDeleteModal.value = false;
+                selectedIds.value = [];
+            },
+        },
+    );
+};
 
 const form = useForm({
     backup_file: null,
@@ -277,7 +334,8 @@ const runNow = () => {
                 <p class="mt-2 text-sm text-slate-500">
                     Unggah file cadangan (<span class="font-medium">.zip</span> lengkap atau
                     <span class="font-medium">.json</span>). Data dipulihkan berdasarkan
-                    <span class="font-semibold">kode_arsip</span> tanpa menghapus data lain.
+                    <span class="font-semibold">kode_arsip</span> tanpa menghapus data lain —
+                    arsip yang dibuat setelah tanggal backup tidak dihapus, hanya yang ada di file cadangan yang diperbarui.
                 </p>
 
                 <input
@@ -306,46 +364,101 @@ const runNow = () => {
 
         <!-- Daftar cadangan tersimpan -->
         <div v-reveal :style="{ transitionDelay: '200ms' }" class="mt-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 class="text-lg font-semibold text-slate-800">Cadangan Tersimpan</h2>
-            <p class="mt-1 text-sm text-slate-500">
-                Cadangan terjadwal harian disimpan di server ini (retensi 14 hari).
-            </p>
+            <div class="flex items-center justify-between">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-800">Cadangan Tersimpan</h2>
+                    <p class="mt-1 text-sm text-slate-500">
+                        Cadangan terjadwal harian disimpan di server ini (retensi 14 hari).
+                    </p>
+                </div>
+                <div v-if="selectedIds.length > 0" class="shrink-0">
+                    <button
+                        type="button"
+                        class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700"
+                        @click="bulkDelete"
+                    >
+                        <AppIcon name="trash" :size="16" :stroke-width="2" decorative />
+                        Hapus {{ selectedIds.length }} Terpilih
+                    </button>
+                </div>
+            </div>
 
             <div v-if="daftarBackup.length === 0" class="mt-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-500">
                 Belum ada cadangan tersimpan. Klik "Cadangkan Sekarang" untuk membuatnya.
             </div>
 
-            <table v-else class="mt-4 w-full text-left text-sm">
-                <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
-                    <tr>
-                        <th class="py-2 pr-4">File</th>
-                        <th class="py-2 pr-4">Waktu</th>
-                        <th class="py-2 pr-4">Isi</th>
-                        <th class="py-2 pr-4">Ukuran</th>
-                        <th class="py-2"></th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100">
-                    <tr v-for="b in daftarBackup" :key="b.nama_file" class="hover:bg-slate-50">
-                        <td class="py-2.5 pr-4 font-mono text-xs">{{ b.nama_file }}</td>
-                        <td class="py-2.5 pr-4 text-slate-600">{{ formatWaktu(b.diambil_pada) }}</td>
-                        <td class="py-2.5 pr-4 text-slate-600">
-                            <span v-if="b.rincian">{{ b.rincian.dokumen_arsip ?? 0 }} arsip · {{ b.rincian.file_fisik ?? 0 }} file</span>
-                        </td>
-                        <td class="py-2.5 pr-4 text-slate-600">{{ formatUkur(b.ukuran_bytes) }}</td>
-                        <td class="py-2.5 text-right">
-                            <a
-                                :href="route('backup.files', b.nama_file)"
-                                class="inline-flex items-center gap-1 text-sm font-semibold text-brand-blue hover:underline"
-                            >
-                                Unduh
-                            </a>
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+            <template v-else>
+                <p v-if="selectedIds.length === 0" class="mt-1 text-xs text-slate-400">Centang cadangan untuk menghapusnya.</p>
+
+                <table class="mt-4 w-full text-left text-sm">
+                    <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
+                        <tr>
+                            <th class="py-2 w-10 text-center">
+                                <input
+                                    type="checkbox"
+                                    :checked="isAllSelected"
+                                    class="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/30"
+                                    @change="onHeaderCheckboxChange"
+                                />
+                            </th>
+                            <th class="py-2 pr-4 text-center">File</th>
+                            <th class="py-2 pr-4 text-center">Waktu</th>
+                            <th class="py-2 pr-4 text-center">Isi</th>
+                            <th class="py-2 pr-4 text-center">Ukuran</th>
+                            <th class="py-2 text-center"></th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        <tr
+                            v-for="b in daftarBackup"
+                            :key="b.nama_file"
+                            class="hover:bg-slate-50 cursor-pointer"
+                            :class="selectedIds.includes(b.nama_file) ? 'bg-blue-50 hover:bg-blue-50' : ''"
+                            @click="toggleRow(b.nama_file)"
+                        >
+                            <td class="py-2.5 text-center" @click.stop>
+                                <input
+                                    type="checkbox"
+                                    :checked="selectedIds.includes(b.nama_file)"
+                                    class="h-4 w-4 rounded border-slate-300 text-brand-blue focus:ring-brand-blue/30"
+                                    @change="(e) => onRowCheckboxChange(e, b.nama_file)"
+                                />
+                            </td>
+                            <td class="py-2.5 pr-4 font-mono text-center text-xs">{{ b.nama_file }}</td>
+                            <td class="py-2.5 pr-4 text-center text-slate-600">{{ formatWaktu(b.diambil_pada) }}</td>
+                            <td class="py-2.5 pr-4 text-center text-slate-600">
+                                <span v-if="b.rincian">{{ b.rincian.dokumen_arsip ?? 0 }} arsip · {{ b.rincian.file_fisik ?? 0 }} file</span>
+                            </td>
+                            <td class="py-2.5 pr-4 text-center text-slate-600">{{ formatUkur(b.ukuran_bytes) }}</td>
+                            <td class="py-2.5 text-center" @click.stop>
+                                <a
+                                    :href="route('backup.files', b.nama_file)"
+                                    class="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:text-blue-700"
+                                >
+                                    <AppIcon name="download" :size="14" :stroke-width="1.8" class="shrink-0" decorative />
+                                    Unduh
+                                </a>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <div v-if="adaLebihLama" class="mt-4 flex items-center justify-between">
+                    <button
+                        type="button"
+                        class="text-sm font-medium text-brand-blue hover:text-blue-700"
+                        @click="router.get(route('backup.index'), { limit: limit + 10 })"
+                    >
+                        Lihat yang lebih lama
+                    </button>
+                </div>
+
+                <p class="mt-3 text-xs text-slate-400">
+                    Daftar menampilkan {{ limit }} cadangan terbaru. File cadangan lebih tua dari 14 hari
+                    dihapus otomatis oleh retensi server. Unduh file untuk menyimpannya secara lokal.
+                </p>
+            </template>
         </div>
-    </AppLayout>
 
     <Modal :show="showConfirm" max-width="md" @close="showConfirm = false">
         <div class="px-6 py-5">
@@ -369,4 +482,30 @@ const runNow = () => {
             </div>
         </div>
     </Modal>
+
+    <Modal :show="showBulkDeleteModal" max-width="md" @close="showBulkDeleteModal = false">
+        <div class="px-6 py-5">
+            <h3 class="text-lg font-bold text-slate-900">Hapus Cadangan</h3>
+            <p class="mt-2 text-sm text-slate-600">
+                Apakah Anda yakin ingin menghapus
+                <span class="font-semibold">{{ selectedIds.length }}</span>
+                cadangan yang dipilih? Tindakan ini tidak dapat dibatalkan.
+            </p>
+            <div class="mt-4 rounded-lg bg-slate-50 p-3 text-xs text-slate-600">
+                <ul class="list-disc pl-5 space-y-0.5">
+                    <li v-for="f in selectedIds" :key="f" class="font-mono">{{ f }}</li>
+                </ul>
+            </div>
+            <div class="mt-6 flex justify-end gap-3">
+                <SecondaryButton type="button" @click="showBulkDeleteModal = false">Batal</SecondaryButton>
+                <PrimaryButton
+                    class="bg-red-600 hover:bg-red-700"
+                    @click="confirmBulkDelete"
+                >
+                    Hapus
+                </PrimaryButton>
+            </div>
+        </div>
+    </Modal>
+</AppLayout>
 </template>

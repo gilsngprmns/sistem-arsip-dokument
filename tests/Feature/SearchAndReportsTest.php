@@ -17,8 +17,8 @@ class SearchAndReportsTest extends TestCase
         $staff = User::factory()->create(['role' => 'staf']);
         $admin = User::factory()->create(['role' => 'admin']);
 
-        $this->actingAs($staff)->get('/reports/users.csv')->assertForbidden();
-        $this->actingAs($admin)->get('/reports/users.csv')->assertOk();
+        $this->actingAs($staff)->get('/reports/users')->assertForbidden();
+        $this->actingAs($admin)->get('/reports/users')->assertOk();
     }
 
     public function test_user_can_upload_a_profile_avatar(): void

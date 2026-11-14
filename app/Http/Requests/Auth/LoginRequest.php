@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -42,19 +43,60 @@ class LoginRequest extends FormRequest
     {
         $this->ensureIsNotRateLimited();
 
-        if (! Auth::attempt([
-            'email' => $this->string('email')->toString(),
-            'password' => $this->string('password')->toString(),
-            'is_active' => true,
-        ], $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+        $attemptedEmail = $this->string('email')->toString();
+        $existingUser = User::where('email', $attemptedEmail)->first();
 
+        // Tolak login untuk akun yang sudah dinonaktifkan (manual admin atau
+        // otomatis oleh lockout brute-force) — pesan spesifik, bukan generik.
+        if ($existingUser && ! $existingUser->is_active) {
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'email' => User::LOCKED_ACCOUNT_MESSAGE,
             ]);
         }
 
-        RateLimiter::clear($this->throttleKey());
+        $authenticated = Auth::attempt([
+            'email' => $attemptedEmail,
+            'password' => $this->string('password')->toString(),
+            'is_active' => true,
+        ], $this->boolean('remember'));
+
+        if ($authenticated) {
+            // Login berhasil — reset counter percobaan (jangan biarkan
+            // nilai lama dari sesi sebelumnya mengotori statistik berikutnya).
+            $this->user()->update(['login_attempts' => 0]);
+            RateLimiter::clear($this->throttleKey());
+
+            return;
+        }
+
+        // Login gagal: increment counter di DB, lalu BACA ULANG nilainya
+        // dari database (jangan percaya return value increment()).
+        // Mencapai batas → kunci akun permanen.
+        if ($existingUser) {
+            User::whereKey($existingUser->id)->increment('login_attempts');
+
+            // Ambil nilai akhir yang tersimpan di DB — sumber kebenaran mutlak.
+            $newAttempts = (int) User::whereKey($existingUser->id)
+                ->value('login_attempts');
+            $existingUser->login_attempts = $newAttempts;
+
+            if ($newAttempts >= User::MAX_LOGIN_ATTEMPTS) {
+                // Set is_active=false secara eksplisit & terpisah, agar pasti
+                // tersimpan meski increment di atas hanya sempat menaikkan counter.
+                $existingUser->is_active = false;
+                $existingUser->login_attempts = $newAttempts;
+                $existingUser->save();
+                throw ValidationException::withMessages([
+                    'email' => User::LOCKED_ACCOUNT_MESSAGE,
+                ]);
+            }
+        }
+
+        RateLimiter::hit($this->throttleKey());
+
+        throw ValidationException::withMessages([
+            'email' => trans('auth.failed'),
+        ]);
     }
 
     /**

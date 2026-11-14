@@ -6,6 +6,7 @@ use App\Http\Requests\StoreArsipRequest;
 use App\Http\Requests\UpdateArsipRequest;
 use App\Models\DokumenArsip;
 use App\Models\RiwayatSirkulasi;
+use App\Models\BoksArsip;
 use App\Models\RakArsip;
 use App\Models\Seksi;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,7 +17,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use App\Exports\DocumentExport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ArsipController extends Controller
 {
@@ -30,6 +32,7 @@ class ArsipController extends Controller
         return Inertia::render('Arsip/Index', [
             'arsip' => $query->paginate(10)->withQueryString(),
             'rakList' => $this->rakList(),
+            'boksList' => $this->boksList(),
             'filters' => [
                 'seksi_id' => $request->input('seksi_id'),
                 'status' => $request->input('status', 'semua'),
@@ -47,59 +50,16 @@ class ArsipController extends Controller
     }
 
     /**
-     * Ekspor daftar arsip (mengikuti filter aktif) ke CSV.
+     * Ekspor daftar arsip (mengikuti filter aktif) ke Excel .xlsx.
      */
-    public function exportCsv(Request $request): StreamedResponse
+    public function exportExcel(Request $request)
     {
-        $filename = 'arsip-dokumen-'.now()->format('YmdHis').'.csv';
         $query = $this->filteredQuery($request);
 
-        return response()->streamDownload(function () use ($query) {
-            $handle = fopen('php://output', 'w');
-
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-
-            fputcsv($handle, [
-                'Kode Arsip',
-                'Nomor Surat',
-                'Perihal',
-                'Jenis Surat',
-                'Sifat Surat',
-                'Tanggal Surat',
-                'Tanggal Diterima',
-                'Asal Instansi',
-                'Tujuan Instansi',
-                'Seksi',
-                'Status Arsip',
-                'Catatan',
-                'File Path',
-            ], ';');
-
-            $query->chunk(200, function ($rows) use ($handle) {
-                foreach ($rows as $row) {
-                    fputcsv($handle, [
-                        $row->kode_arsip,
-                        $row->nomor_surat,
-                        $row->perihal,
-                        $row->jenis_surat,
-                        $row->sifat_surat,
-                        optional($row->tanggal_surat)?->format('Y-m-d'),
-                        optional($row->tanggal_diterima)?->format('Y-m-d'),
-                        $row->asal_instansi,
-                        $row->tujuan_instansi,
-                        $row->seksi?->nama_seksi,
-                        $row->status_arsip,
-                        $row->catatan,
-                        $row->file_path,
-                    ], ';');
-                }
-            });
-
-            fclose($handle);
-        }, $filename, [
-            'Content-Type' => 'text/csv; charset=UTF-8',
-            'Content-Disposition' => 'attachment; filename="'.basename($filename).'"',
-        ]);
+        return Excel::download(
+            new DocumentExport($query->get()),
+            'arsip-dokumen-'.now()->format('YmdHis').'.xlsx',
+        );
     }
 
     /**
@@ -110,6 +70,7 @@ class ArsipController extends Controller
         return Inertia::render('Arsip/Create', [
             'seksiList' => Seksi::orderByOrganisasi()->get(['id', 'nama_seksi']),
             'rakList' => $this->rakList(),
+            'boksList' => $this->boksList(),
         ]);
     }
 
@@ -155,12 +116,17 @@ class ArsipController extends Controller
 
         $arsip->load([
             'seksi',
-            'rak.lokasiArsip',
+            'rak',
+            'boks.rak',
             'riwayatSirkulasi' => fn ($query) => $query->with('user:id,name')->latest('waktu_aksi'),
         ]);
 
         return Inertia::render('Arsip/Show', [
             'arsip' => $arsip,
+            'seksiList' => Seksi::orderByOrganisasi()->get(['id', 'nama_seksi']),
+            'rakList' => $this->rakList(),
+            'boksList' => $this->boksList(),
+            'previousUrl' => request()->header('referer'),
         ]);
     }
 
@@ -175,6 +141,7 @@ class ArsipController extends Controller
             'arsip' => $arsip,
             'seksiList' => Seksi::orderByOrganisasi()->get(['id', 'nama_seksi']),
             'rakList' => $this->rakList(),
+            'boksList' => $this->boksList(),
         ]);
     }
 
@@ -195,16 +162,8 @@ class ArsipController extends Controller
 
         $arsip->update($data);
 
-        if (request()->header('X-Inertia')) {
-            // flash() bertahan ke request BERIKUTNYA (full-page-load yang
-            // dipicu Inertia::location() ke /arsip), lalu otomatis
-            // dikonsumsi dan di-flush. Tidak bocor ke kunjungan berikutnya.
-            session()->flash('success', 'Dokumen arsip berhasil diperbarui.');
-            return Inertia::location(route('arsip.index'));
-        }
-
         return redirect()
-            ->route('arsip.index')
+            ->back()
             ->with('success', 'Dokumen arsip berhasil diperbarui.');
     }
 
@@ -494,7 +453,7 @@ class ArsipController extends Controller
 
     protected function filteredQuery(Request $request): Builder
     {
-        $query = DokumenArsip::query()->with(['seksi', 'rak.lokasiArsip']);
+        $query = DokumenArsip::query()->with(['seksi', 'rak', 'boks.rak']);
 
         $user = $request->user();
 
@@ -579,10 +538,19 @@ class ArsipController extends Controller
     protected function rakList()
     {
         return RakArsip::query()
-            ->with('lokasiArsip:id,nama_lokasi')
             ->where('is_active', true)
             ->orderBy('kode_rak')
-            ->get(['id', 'lokasi_id', 'seksi_id', 'kode_rak', 'nama_rak', 'nomor_rak', 'kapasitas']);
+            ->get(['id', 'seksi_id', 'kode_rak', 'nama_rak', 'nomor_rak']);
+    }
+
+    protected function boksList()
+    {
+        return BoksArsip::query()
+            ->with('rak:id,kode_rak,nama_rak')
+            ->where('is_active', true)
+            ->withCount('dokumenArsip')
+            ->orderBy('kode_boks')
+            ->get(['id', 'rak_id', 'kode_boks', 'nomor_baris', 'nomor_boks', 'kapasitas']);
     }
 
     protected function catatSirkulasi(

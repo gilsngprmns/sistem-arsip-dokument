@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\BoksArsip;
 use App\Models\DokumenArsip;
-use App\Models\LokasiArsip;
 use App\Models\RakArsip;
 use App\Models\RiwayatSirkulasi;
 use App\Models\Seksi;
@@ -19,13 +19,7 @@ class DashboardOperationsTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
-        $lokasi = LokasiArsip::create([
-            'kode_lokasi' => 'LOC-001',
-            'nama_lokasi' => 'Ruang Arsip',
-            'is_active' => true,
-        ]);
         $rak = RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-001',
             'nama_rak' => 'Rak Utama',
@@ -98,13 +92,7 @@ class DashboardOperationsTest extends TestCase
             'role' => 'staf',
             'seksi_id' => $seksiA->id,
         ]);
-        $lokasi = LokasiArsip::create([
-            'kode_lokasi' => 'LOC-001',
-            'nama_lokasi' => 'Ruang Arsip',
-            'is_active' => true,
-        ]);
         $rak = RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id' => $seksiA->id,
             'kode_rak' => 'RAK-001',
             'nama_rak' => 'Rak Utama',
@@ -180,13 +168,7 @@ class DashboardOperationsTest extends TestCase
     {
         $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
         $user = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
-        $lokasi = LokasiArsip::create([
-            'kode_lokasi' => 'LOC-001',
-            'nama_lokasi' => 'Ruang Arsip',
-            'is_active' => true,
-        ]);
         $rak = RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-001',
             'nama_rak' => 'Rak Utama',
@@ -256,23 +238,22 @@ class DashboardOperationsTest extends TestCase
             );
     }
 
-    public function test_admin_rack_attention_shows_only_racks_above_80_percent(): void
+    public function test_admin_boks_attention_shows_only_boks_above_80_percent(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
-        $lokasi = LokasiArsip::create([
-            'kode_lokasi' => 'LOC-R80',
-            'nama_lokasi' => 'Ruang Arsip Test',
-            'is_active' => true,
-        ]);
 
-        // 85% of capacity = 17 / 20 → should appear in rak_perhatian
+        // 85% of capacity = 17 / 20 → should appear in boks_perhatian
         $rackHigh = RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-HIGH',
             'nama_rak' => 'Rak 85%',
             'nomor_rak' => 'H1',
+            'is_active' => true,
+        ]);
+        $boksHigh = BoksArsip::create([
+            'rak_id' => $rackHigh->id,
+            'kode_boks' => 'BOK-HIGH',
             'kapasitas' => 20,
             'is_active' => true,
         ]);
@@ -280,12 +261,13 @@ class DashboardOperationsTest extends TestCase
             DokumenArsip::create([
                 'kode_arsip' => "ARSIP-HIGH-{$i}",
                 'nomor_surat' => "H0{$i}/TEST/2026",
-                'perihal' => "Dokumen rak 85% #{$i}",
+                'perihal' => "Dokumen boks 85% #{$i}",
                 'jenis_surat' => 'masuk',
                 'sifat_surat' => 'biasa',
                 'tanggal_surat' => now()->toDateString(),
                 'seksi_id' => $seksi->id,
                 'rak_id' => $rackHigh->id,
+                'boks_id' => $boksHigh->id,
                 'status_arsip' => 'tersedia',
                 'dicatat_oleh' => $admin->id,
             ]);
@@ -293,11 +275,15 @@ class DashboardOperationsTest extends TestCase
 
         // 50% of capacity = 10 / 20 → should NOT appear
         $rackLow = RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-LOW',
             'nama_rak' => 'Rak 50%',
             'nomor_rak' => 'L1',
+            'is_active' => true,
+        ]);
+        $boksLow = BoksArsip::create([
+            'rak_id' => $rackLow->id,
+            'kode_boks' => 'BOK-LOW',
             'kapasitas' => 20,
             'is_active' => true,
         ]);
@@ -305,12 +291,13 @@ class DashboardOperationsTest extends TestCase
             DokumenArsip::create([
                 'kode_arsip' => "ARSIP-LOW-{$i}",
                 'nomor_surat' => "L0{$i}/TEST/2026",
-                'perihal' => "Dokumen rak 50% #{$i}",
+                'perihal' => "Dokumen boks 50% #{$i}",
                 'jenis_surat' => 'masuk',
                 'sifat_surat' => 'biasa',
                 'tanggal_surat' => now()->toDateString(),
                 'seksi_id' => $seksi->id,
                 'rak_id' => $rackLow->id,
+                'boks_id' => $boksLow->id,
                 'status_arsip' => 'tersedia',
                 'dicatat_oleh' => $admin->id,
             ]);
@@ -319,10 +306,10 @@ class DashboardOperationsTest extends TestCase
         $this->actingAs($admin)->get('/dashboard')->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('Dashboard')
-                ->where('notifications.rak_hampir_penuh', 1)
-                ->has('adminOverview.rak_perhatian', 1)
-                ->where('adminOverview.rak_perhatian.0.kode_rak', 'RAK-HIGH')
-                ->where('adminOverview.rak_perhatian.0.pct', 85)
+                ->where('notifications.boks_hampir_penuh', 1)
+                ->has('adminOverview.boks_perhatian', 1)
+                ->where('adminOverview.boks_perhatian.0.kode_boks', 'BOK-HIGH')
+                ->where('adminOverview.boks_perhatian.0.pct', 85)
             );
     }
 

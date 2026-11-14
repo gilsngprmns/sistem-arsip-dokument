@@ -10,13 +10,17 @@ class RakArsip extends Model
 {
     protected $table = 'rak_arsip';
 
+    /** Konstanta gedung — satu-satunya gedung arsip kelurahan (tanpa CRUD). */
+    public const GEDUNG = 'Gedung Kelurahan Grogol Selatan';
+
+    /** Konstanta ruang — ruang arsip tetap (tanpa CRUD). */
+    public const RUANG = 'Ruang Arsip';
+
     protected $fillable = [
-        'lokasi_id',
         'seksi_id',
         'kode_rak',
         'nama_rak',
         'nomor_rak',
-        'kapasitas',
         'deskripsi',
         'is_active',
     ];
@@ -28,23 +32,18 @@ class RakArsip extends Model
         ];
     }
 
-    public function lokasiArsip(): BelongsTo
-    {
-        return $this->belongsTo(LokasiArsip::class, 'lokasi_id');
-    }
-
     public function seksi(): BelongsTo
     {
         return $this->belongsTo(Seksi::class, 'seksi_id');
     }
 
+    public function boksArsip(): HasMany
+    {
+        return $this->hasMany(BoksArsip::class, 'rak_id');
+    }
+
     public function dokumenArsip(): HasMany
     {
         return $this->hasMany(DokumenArsip::class, 'rak_id');
-    }
-
-    public function getDisplayKapasitasAttribute(): int
-    {
-        return $this->kapasitas ?? 200;
     }
 }

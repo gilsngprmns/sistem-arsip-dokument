@@ -16,6 +16,10 @@ const props = defineProps({
 
 const emit = defineEmits(['found']);
 
+// Tipe hasil scan: 'arsip' | 'boks' | null
+const foundResult = ref(null);
+const foundType = ref(null);
+
 const scannerId = 'qr-reader-region';
 const statusMessage = ref('');
 const statusType = ref('info');
@@ -32,29 +36,58 @@ const setStatus = (message, type = 'info') => {
     statusType.value = type;
 };
 
+// QR boks berisi URL /scan/boks/{kode_boks}. Saat menemukan URL scan,
+// lakukan POST ke API baru /api/boks/scan/{kode_boks}.
 const lookupKode = async (decodedText) => {
-    const kode = String(decodedText || '').trim();
+    const raw = String(decodedText || '').trim();
 
-    if (!kode) {
+    if (!raw) {
         return;
     }
 
     const now = Date.now();
-    if (kode === lastScannedCode && now - lastScannedAt < 2500) {
+    if (raw === lastScannedCode && now - lastScannedAt < 2500) {
         return;
     }
 
-    lastScannedCode = kode;
+    lastScannedCode = raw;
     lastScannedAt = now;
 
-    setStatus(`Mencari arsip: ${kode}...`, 'info');
+    // Coba ekstrak kode boks dari URL scan boks: /scan/boks/KODE atau https://.../scan/boks/KODE
+    const boksMatch = raw.match(/\/scan\/boks\/([^/?]+)/);
 
+    if (boksMatch) {
+        const kodeBoks = boksMatch[1];
+        setStatus(`Mencari boks: ${kodeBoks}...`, 'info');
+        try {
+            const { data } = await axios.post(`/api/boks/scan/${encodeURIComponent(kodeBoks)}`, {});
+            foundType.value = 'boks';
+            foundArsip.value = null;
+            foundResult.value = data;
+            setStatus('Boks ditemukan.', 'success');
+            emit('found', data);
+        } catch (error) {
+            foundType.value = null;
+            foundResult.value = null;
+            foundArsip.value = null;
+            const message = error?.response?.data?.message || 'Kode boks tidak ditemukan';
+            setStatus(message, 'error');
+        }
+        return;
+    }
+
+    // Fallback: anggap kode langsung = kode arsip
+    setStatus(`Mencari arsip: ${raw}...`, 'info');
     try {
-        const { data } = await axios.post('/api/arsip/scan', { kode_arsip: kode });
+        const { data } = await axios.post('/api/arsip/scan', { kode_arsip: raw });
+        foundType.value = 'arsip';
+        foundResult.value = null;
         foundArsip.value = data;
         setStatus('Arsip ditemukan.', 'success');
         emit('found', data);
     } catch (error) {
+        foundType.value = null;
+        foundResult.value = null;
         foundArsip.value = null;
         const message = error?.response?.data?.message || 'Kode arsip tidak ditemukan';
         setStatus(message, 'error');
@@ -203,6 +236,7 @@ onBeforeUnmount(() => {
             {{ statusMessage }}
         </p>
 
+        <!-- Hasil scan arsip -->
         <div
             v-if="foundArsip"
             class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950"
@@ -214,6 +248,25 @@ onBeforeUnmount(() => {
                 Status:
                 <span class="font-semibold">{{ foundArsip.status_arsip }}</span>
                 <span v-if="foundArsip.seksi"> • {{ foundArsip.seksi.nama_seksi }}</span>
+            </p>
+        </div>
+
+        <!-- Hasil scan boks -->
+        <div
+            v-if="foundResult"
+            class="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-950"
+        >
+            <p class="font-bold text-emerald-800">{{ foundResult.kode_boks }}</p>
+            <p class="mt-1 text-emerald-800/80">
+                Rak: {{ foundResult.rak?.kode_rak || '—' }}
+                <span v-if="foundResult.rak?.nama_rak"> ({{ foundResult.rak.nama_rak }})</span>
+            </p>
+            <p class="mt-1 text-emerald-800/80">
+                No. Baris: {{ foundResult.nomor_baris || '—' }} · No. Boks: {{ foundResult.nomor_boks || '—' }}
+            </p>
+            <p class="mt-2">
+                <span class="font-semibold">Kapasitas:</span>
+                {{ foundResult.dokumen_arsip_count ?? 0 }} / {{ foundResult.kapasitas || '—' }} dokumen
             </p>
         </div>
     </div>

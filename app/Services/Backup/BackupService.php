@@ -126,6 +126,11 @@ class BackupService
      * Impor baris ke basis data. Baris bermasalah di-skip + dicatat,
      * baris valid tetap masuk — kegagalan sebagian tidak menggagalkan semua.
      *
+     * Catatan: JSON v1 hanya berisi baris dokumen (tanpa referensi seksi/rak),
+     * sehingga restore hanya bekerja andal di mesin dengan id referensi yang
+     * sama. Untuk migrasi antar-mesin, gunakan bundel ZIP (v2) yang
+     * menyertakan seksi, rak, lokasi, dan remap FK otomatis.
+     *
      * @param  list<array<string, mixed>>  $rows
      * @return array<string, mixed> Metrik: dibuat, diperbarui, dilewati, detil_lewati, peringatan
      */
@@ -169,8 +174,8 @@ class BackupService
 
             // rak_id opsional, tapi bila ada harus cocok
             if (! empty($payload['rak_id']) && ! in_array($payload['rak_id'], $rakHidup, true)) {
-                $this->catatSkip($skipped, $kode, 'merujuk rak (id '.$payload['rak_id'].') yang tidak ada di sistem ini');
-                continue;
+                $payload['rak_id'] = null;
+                $peringatan[] = $kode.': rak sumber tidak ada di sistem ini — posisi rak dikosongkan';
             }
 
             // pencatat yang tidak ada di target → kosongkan, jangan buang arsipnya

@@ -3,9 +3,14 @@
 namespace Tests\Feature;
 
 use App\Models\DokumenArsip;
+use App\Models\ActivityLog;
+use App\Models\BoksArsip;
+use App\Models\RakArsip;
 use App\Models\Seksi;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
 use Tests\TestCase;
 
 class AuthActivityLogTest extends TestCase
@@ -86,6 +91,8 @@ class AuthActivityLogTest extends TestCase
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::create(['nama_seksi' => 'Seksi Test']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
+        $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-DEL', 'nama_rak' => 'Rak Del', 'is_active' => true]);
+        $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-DEL', 'is_active' => true]);
 
         $this->actingAs($staf)->post('/arsip', [
             'kode_arsip'    => 'STF-DEL-001',
@@ -94,6 +101,8 @@ class AuthActivityLogTest extends TestCase
             'jenis_surat'   => 'keluar',
             'tanggal_surat' => '2026-11-01',
             'seksi_id'      => $seksi->id,
+            'rak_id'        => $rak->id,
+            'boks_id'       => $boks->id,
         ]);
 
         $arsip = DokumenArsip::where('kode_arsip', 'STF-DEL-001')->first();
@@ -149,6 +158,8 @@ class AuthActivityLogTest extends TestCase
     {
         $seksi = Seksi::create(['nama_seksi' => 'Seksi Test']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
+        $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-UPD', 'nama_rak' => 'Rak Upd', 'is_active' => true]);
+        $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-UPD', 'is_active' => true]);
 
         $this->actingAs($staf)->post('/arsip', [
             'kode_arsip'    => 'STF-UPD-001',
@@ -157,6 +168,8 @@ class AuthActivityLogTest extends TestCase
             'jenis_surat'   => 'masuk',
             'tanggal_surat' => '2026-11-01',
             'seksi_id'      => $seksi->id,
+            'rak_id'        => $rak->id,
+            'boks_id'       => $boks->id,
         ]);
 
         $arsip = DokumenArsip::where('kode_arsip', 'STF-UPD-001')->first();
@@ -170,6 +183,8 @@ class AuthActivityLogTest extends TestCase
                 'jenis_surat'   => 'masuk',
                 'tanggal_surat' => '2026-11-01',
                 'seksi_id'      => $seksi->id,
+                'rak_id'        => $rak->id,
+                'boks_id'       => $boks->id,
             ]);
 
         $this->assertDatabaseHas('activity_logs', [
@@ -219,6 +234,8 @@ class AuthActivityLogTest extends TestCase
     {
         $seksi = Seksi::create(['nama_seksi' => 'Seksi Sukses']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
+        $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-OK', 'nama_rak' => 'Rak OK', 'is_active' => true]);
+        $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-OK', 'is_active' => true]);
 
         $this->actingAs($staf)->post('/arsip', [
             'kode_arsip'    => 'OK-001',
@@ -227,6 +244,8 @@ class AuthActivityLogTest extends TestCase
             'jenis_surat'   => 'masuk',
             'tanggal_surat' => '2026-11-01',
             'seksi_id'      => $seksi->id,
+            'rak_id'        => $rak->id,
+            'boks_id'       => $boks->id,
         ]);
 
         $log = \App\Models\ActivityLog::where('user_id', $staf->id)
@@ -242,13 +261,7 @@ class AuthActivityLogTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::create(['nama_seksi' => 'Seksi Hilang']);
-        $lokasi = \App\Models\LokasiArsip::create([
-            'kode_lokasi' => 'LOC-FAIL',
-            'nama_lokasi' => 'Ruang Fail',
-            'is_active'   => true,
-        ]);
         $rak = \App\Models\RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id'  => $seksi->id,
             'kode_rak'  => 'RAK-FAIL',
             'nama_rak'  => 'Rak Fail',
@@ -382,8 +395,8 @@ class AuthActivityLogTest extends TestCase
         $this->assertNotNull($log, 'Log activity.index harus ada');
         $this->assertSame('Membuka log aktivitas.', $log->description);
 
-        // GET /reports/activity.csv
-        $this->actingAs($admin)->get('/reports/activity.csv');
+        // GET /reports/activity (Excel)
+        $this->actingAs($admin)->get('/reports/activity');
         $log = \App\Models\ActivityLog::where('user_id', $admin->id)
             ->where('route_name', 'reports.activity')
             ->where('method', 'GET')
@@ -391,8 +404,8 @@ class AuthActivityLogTest extends TestCase
         $this->assertNotNull($log, 'Log reports.activity harus ada');
         $this->assertSame('Mengekspor laporan aktivitas.', $log->description);
 
-        // GET /reports/users.csv
-        $this->actingAs($admin)->get('/reports/users.csv');
+        // GET /reports/users (Excel)
+        $this->actingAs($admin)->get('/reports/users');
         $log = \App\Models\ActivityLog::where('user_id', $admin->id)
             ->where('route_name', 'reports.users')
             ->where('method', 'GET')
@@ -400,8 +413,8 @@ class AuthActivityLogTest extends TestCase
         $this->assertNotNull($log, 'Log reports.users harus ada');
         $this->assertSame('Mengekspor laporan pengguna.', $log->description);
 
-        // GET /reports/racks.csv
-        $this->actingAs($admin)->get('/reports/racks.csv');
+        // GET /reports/racks (Excel)
+        $this->actingAs($admin)->get('/reports/racks');
         $log = \App\Models\ActivityLog::where('user_id', $admin->id)
             ->where('route_name', 'reports.racks')
             ->where('method', 'GET')
@@ -409,8 +422,8 @@ class AuthActivityLogTest extends TestCase
         $this->assertNotNull($log, 'Log reports.racks harus ada');
         $this->assertSame('Mengekspor laporan rak.', $log->description);
 
-        // GET /reports/sections.csv
-        $this->actingAs($admin)->get('/reports/sections.csv');
+        // GET /reports/sections (Excel)
+        $this->actingAs($admin)->get('/reports/sections');
         $log = \App\Models\ActivityLog::where('user_id', $admin->id)
             ->where('route_name', 'reports.sections')
             ->where('method', 'GET')
@@ -518,13 +531,7 @@ class AuthActivityLogTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::create(['nama_seksi' => 'Seksi Test Rak']);
-        $lokasi = \App\Models\LokasiArsip::create([
-            'kode_lokasi' => 'LOC-TGT',
-            'nama_lokasi' => 'Test Location',
-            'is_active'   => true,
-        ]);
         $rak = \App\Models\RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id'  => $seksi->id,
             'kode_rak'  => 'RAK-TGT-001',
             'nama_rak'  => 'Test Rack',
@@ -535,7 +542,6 @@ class AuthActivityLogTest extends TestCase
         $this->actingAs($admin)->put("/rak/{$rak->id}", [
             'kode_rak'  => 'RAK-TGT-001',
             'nama_rak'  => 'Test Rack Updated',
-            'lokasi_id' => $lokasi->id,
             'seksi_id'  => $seksi->id,
             'nomor_rak' => '1',
             'is_active' => true,
@@ -553,5 +559,150 @@ class AuthActivityLogTest extends TestCase
             ->latest()->first();
 
         $this->assertSame('RAK-TGT-001', $log->target_label);
+    }
+
+    // ── Pemulihan kata sandi (lupa kata sandi) tercatat di Activity Log ──
+    // Proses OTP berjalan tanpa login, jadi dicatat langsung oleh
+    // OtpPasswordController, bukan middleware RecordActivity. Baris "aktivitas"
+    // dan "selesai" berbagi target_id (email) agar satu percobaan bisa
+    // ditelusuri sampai selesai.
+
+    private function seedOtp(string $email): void
+    {
+        DB::table('password_reset_tokens')->insert([
+            'email'      => $email,
+            'token'      => hash('sha256', '123456'),
+            'created_at' => now(),
+        ]);
+    }
+
+    public function test_password_reset_flow_is_logged_from_activity_to_finish(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create(['email' => 'reset@example.com']);
+
+        // 1) Aktivitas: tombol "Kirim Kode Verifikasi". sendOtp mem-persist
+        // token acak, jadi ambil kode OTP yang benar dari mail yang di-fake.
+        $this->postJson(route('password.otp.send'), ['email' => $user->email])
+            ->assertOk();
+        $otp = null;
+        Mail::assertSent(\App\Mail\OtpResetPasswordMail::class, function ($mail) use ($user, &$otp) {
+            $otp = $mail->otp;
+            return $mail->hasTo($user->email);
+        });
+        $this->assertNotNull($otp, 'OTP harus terkirim ke email');
+
+        $this->assertDatabaseHas('activity_logs', [
+            'user_id'      => $user->id,
+            'action'       => 'password.otp.send',
+            'target_id'    => $user->id,
+            'target_type'  => 'user',
+            'target_label' => $user->name,
+        ]);
+        // Kunci penelusuran percobaan = metadata.email
+        $this->assertSame(
+            $user->email,
+            ActivityLog::where('action', 'password.otp.send')->latest()->first()->metadata['email']
+        );
+        $this->assertDatabaseHas('activity_logs', [
+            'user_id' => $user->id,
+            'action'  => 'password.otp.send',
+        ]);
+        $this->assertSame(
+            'sukses',
+            ActivityLog::where('action', 'password.otp.send')->latest()->first()->metadata['hasil']
+        );
+
+        // 2) Verifikasi (berhasil). Pakai OTP yang sama dengan yang dikirim.
+        $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp'   => $otp,
+        ])->assertOk();
+
+        $this->assertDatabaseHas('activity_logs', [
+            'user_id' => $user->id,
+            'action'  => 'password.otp.verify',
+        ]);
+        $this->assertSame(
+            'sukses',
+            ActivityLog::where('action', 'password.otp.verify')->latest()->first()->metadata['hasil']
+        );
+
+        // 3) Selesai: kata sandi diganti
+        $this->postJson(route('password.otp.reset'), [
+            'email'                    => $user->email,
+            'otp'                      => $otp,
+            'password'                 => 'newpassword',
+            'password_confirmation'    => 'newpassword',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('activity_logs', [
+            'user_id'    => $user->id,
+            'action'     => 'password.otp.finish',
+            'target_id'  => $user->id,
+        ]);
+        $this->assertSame(
+            'sukses',
+            ActivityLog::where('action', 'password.otp.finish')->latest()->first()->metadata['hasil']
+        );
+
+        // Satu percobaan lengkap (aktivitas → verifikasi → selesai) berbagi
+        // kunci user_id sama sehingga bisa ditelusuri sampai selesai.
+        $keys = ActivityLog::query()
+            ->where('user_id', $user->id)
+            ->whereIn('action', ['password.otp.send', 'password.otp.verify', 'password.otp.finish'])
+            ->count();
+        $this->assertSame(3, $keys);
+
+        // Ketiga baris — termasuk send & verify — harus muncul di halaman
+        // /activity-log (bukan tersembunyi oleh filter route), dan opsi
+        // send/verify ikut terdaftar di daftar penyaring "aksi".
+        $admin = User::factory()->create(['role' => 'admin']);
+        $this->actingAs($admin)->get('/activity-log')->assertOk()
+            ->assertInertia(function ($page) {
+                $page->component('Activity/Index');
+                $page->where('activities.data.0.action', 'password.otp.send');
+                $page->where('activities.data.1.action', 'password.otp.verify');
+                $page->where('activities.data.2.action', 'password.otp.finish');
+                $page->where('actions', function ($actions) {
+                    return collect($actions)->contains('password.otp.send')
+                        && collect($actions)->contains('password.otp.verify')
+                        && collect($actions)->contains('password.otp.finish');
+                });
+            });
+    }
+
+    public function test_failed_otp_verification_logs_gagal_with_email_key(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create(['email' => 'fail@example.com']);
+        $this->seedOtp($user->email);
+
+        // Kode salah (token di DB = hash '123456', kirim '000000')
+        $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp'   => '000000',
+        ])->assertStatus(422);
+
+        $log = ActivityLog::where('action', 'password.otp.verify')
+            ->where('user_id', $user->id)->latest()->first();
+
+        $this->assertNotNull($log, 'Verifikasi gagal harus tercatat');
+        $this->assertSame('gagal', $log->metadata['hasil']);
+        $this->assertStringStartsWith('Gagal', $log->description);
+        // Tetap berkey email (di metadata) agar percobaan yang gagal tidak hilang,
+        // dan bisa direlasikan ke user lewat user_id.
+        $this->assertSame($user->email, $log->metadata['email']);
+    }
+
+    public function test_unregistered_email_send_is_not_logged(): void
+    {
+        Mail::fake();
+
+        $this->postJson(route('password.otp.send'), ['email' => 'nope@example.com'])
+            ->assertStatus(422)
+            ->assertJson(['error' => 'not-registered']);
+
+        $this->assertDatabaseCount('activity_logs', 0);
     }
 }

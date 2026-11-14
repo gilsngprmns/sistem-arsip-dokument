@@ -24,6 +24,7 @@ import {
     Clock,
     Database,
     Download,
+    Lock,
     Eye,
     EyeOff,
     File,
@@ -33,10 +34,12 @@ import {
     FileText,
     FileX,
     Folder,
+    FileSpreadsheet,
     Grid3x3,
     HeartHandshake,
     HelpCircle,
     History,
+    Home,
     Image,
     Images,
     KeyRound,
@@ -48,6 +51,7 @@ import {
     MapPin,
     Menu,
     MoreHorizontal,
+    Package,
     PanelLeft,
     PanelsTopLeft,
     PenLine,
@@ -98,6 +102,7 @@ const REGISTRY = {
 
     // kunci seksi (Sidebar seksiMeta().icon)
     building: Landmark,
+    home: Home,
     globe: TrendingUp,
     heart: HeartHandshake,
     folder: Folder,
@@ -154,11 +159,16 @@ const REGISTRY = {
     image: Image,
     upload: Download,
     camera: Camera,
+    box: Package,
     server: Server,
     clock: Clock,
     star: Star,
     help: HelpCircle,
     'help-circle': HelpCircle,
+    lock: Lock,
+    arsip: Archive,
+    dipinjam: RefreshCw,
+    excel: FileSpreadsheet,
 };
 
 const props = defineProps({

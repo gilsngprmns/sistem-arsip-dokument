@@ -27,8 +27,6 @@ class ActivityLogController extends Controller
                 ->with('user:id,name,email,role')
                 ->whereNotIn('route_name', [
                     'password.request',
-                    'password.otp.send',
-                    'password.otp.verify',
                     'password.otp.reset',
                     'password.confirm',
                     'verification.send',
@@ -67,8 +65,6 @@ class ActivityLogController extends Controller
                 ->with('user:id,name,email,role')
                 ->whereNotIn('route_name', [
                     'password.request',
-                    'password.otp.send',
-                    'password.otp.verify',
                     'password.otp.reset',
                     'password.confirm',
                     'verification.send',

@@ -3,8 +3,8 @@
 namespace Tests\Feature;
 
 use App\Models\ActivityLog;
+use App\Models\BoksArsip;
 use App\Models\DokumenArsip;
-use App\Models\LokasiArsip;
 use App\Models\RakArsip;
 use App\Models\RiwayatSirkulasi;
 use App\Models\Seksi;
@@ -201,15 +201,17 @@ class BackupTest extends TestCase
         $bundles = app(BundleBackupService::class);
 
         // — Data sumber: satu pohon referensi lengkap + 1 arsip ber-riwayat & ber-file —
-        $lokasi = LokasiArsip::create([
-            'kode_lokasi' => 'LOC-A', 'nama_lokasi' => 'Gedung A', 'lantai' => '2',
-        ]);
         $rak = RakArsip::create([
-            'lokasi_id' => $lokasi->id, 'kode_rak' => 'RAK-01', 'nama_rak' => 'Rak Utama',
+            'kode_rak' => 'RAK-01', 'nama_rak' => 'Rak Utama',
+        ]);
+        $boks = BoksArsip::create([
+            'kode_boks' => 'BOK-RAK-01', 'rak_id' => $rak->id,
+            'nomor_baris' => 'B-01', 'nomor_boks' => 'BOX-01',
         ]);
         $dok = DokumenArsip::factory()->create([
             'seksi_id' => $this->seksi->id,
             'rak_id' => $rak->id,
+            'boks_id' => $boks->id,
             'kode_arsip' => 'RT-001',
             'dicatat_oleh' => $this->admin->id,
             'file_path' => 'lampiran-arsip/bukti.png',
@@ -259,10 +261,11 @@ class BackupTest extends TestCase
         // — Referensi terbentuk tanpa FK gantung —
         $this->assertSame(1, Seksi::count());
         $this->assertSame('Pemerintahan', Seksi::first()->nama_seksi);
-        $this->assertSame(1, LokasiArsip::where('kode_lokasi', 'LOC-A')->count());
+        $this->assertSame(1, BoksArsip::where('kode_boks', 'BOK-RAK-01')->count());
         $rakBaru = RakArsip::where('kode_rak', 'RAK-01')->first();
         $this->assertNotNull($rakBaru);
-        $this->assertSame(LokasiArsip::where('kode_lokasi', 'LOC-A')->first()->id, $rakBaru->lokasi_id);
+        $boksBaru = BoksArsip::where('kode_boks', 'BOK-RAK-01')->first();
+        $this->assertSame($rakBaru->id, $boksBaru->rak_id);
 
         // — Arsip + riwayat + file fisik —
         $dokBaru = DokumenArsip::where('kode_arsip', 'RT-001')->first();
@@ -272,6 +275,8 @@ class BackupTest extends TestCase
         $this->assertSame(1, RiwayatSirkulasi::count());
         $this->assertSame('dipinjam', RiwayatSirkulasi::first()->jenis_aksi);
         $this->assertSame('KONTEN-UJI', (string) Storage::disk('public')->get('lampiran-arsip/bukti.png'));
+
+        $this->assertSame($boksBaru->id, $dokBaru->boks_id, 'boks_id remap ke boks hidup di target');
 
         $this->assertSame(1, $metrik['dibuat']);
         $this->assertSame(1, $metrik['riwayat']['disalin']);
@@ -292,7 +297,7 @@ class BackupTest extends TestCase
         try {
             foreach ([
                 'riwayat_sirkulasi', 'activity_logs', 'dokumen_arsip',
-                'rak_arsip', 'lokasi_arsip', 'seksi', 'users',
+                'rak_arsip', 'boks_arsip', 'seksi', 'users',
             ] as $tabel) {
                 \Illuminate\Support\Facades\DB::table($tabel)->truncate();
             }

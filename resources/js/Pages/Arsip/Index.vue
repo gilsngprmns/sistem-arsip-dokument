@@ -38,6 +38,7 @@ const props = defineProps({
 const page = usePage();
 const seksiList = computed(() => page.props.seksiList ?? []);
 const rakList = computed(() => page.props.rakList ?? []);
+const boksList = computed(() => page.props.boksList ?? []);
 const flashSuccess = computed(() => page.props.flash?.success);
 const flashVisible = ref(false);
 let flashTimer = null;
@@ -339,7 +340,7 @@ const confirmTandahilang = () => {
     );
 };
 
-const exportCsv = () => {
+const exportExcel = () => {
     const params = new URLSearchParams();
 
     if (localFilters.value.seksi_id) params.set('seksi_id', localFilters.value.seksi_id);
@@ -515,12 +516,12 @@ onUnmounted(() => {
                     </button>
                     <button
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 sm:flex-none"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:flex-none"
                         title="Unduh daftar sesuai filter aktif"
-                        @click="exportCsv"
+                        @click="exportExcel"
                     >
-                        <AppIcon name="download" :size="16" :stroke-width="1.8" class="h-4 w-4" decorative />
-                        Ekspor CSV
+                        <AppIcon name="excel" :size="16" :stroke-width="1.8" class="h-4 w-4" decorative />
+                        Ekspor Excel
                     </button>
                 </div>
             </div>
@@ -703,6 +704,7 @@ onUnmounted(() => {
         mode="edit"
         :seksi-list="seksiList"
         :rak-list="rakList"
+        :boks-list="boksList"
         :initial-data="editingArsip"
         @close="closeForm"
     />

@@ -30,6 +30,10 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    boksList: {
+        type: Array,
+        default: () => [],
+    },
 });
 
 const form = useForm({
@@ -45,9 +49,7 @@ const form = useForm({
     tujuan_instansi: props.arsip.tujuan_instansi ?? '',
     seksi_id: props.arsip.seksi_id,
     rak_id: props.arsip.rak_id ?? '',
-    nomor_box: props.arsip.nomor_box ?? '',
-    nomor_map: props.arsip.nomor_map ?? '',
-    nomor_slot: props.arsip.nomor_slot ?? '',
+    boks_id: props.arsip.boks_id ?? '',
     catatan: props.arsip.catatan ?? '',
     lampiran: null,
 });
@@ -62,6 +64,11 @@ const filteredRakList = computed(() => {
     });
 });
 
+const filteredBoksList = computed(() => {
+    if (!form.rak_id) return [];
+    return (props.boksList ?? []).filter((boks) => Number(boks.rak_id) === Number(form.rak_id));
+});
+
 watch(
     () => form.seksi_id,
     () => {
@@ -69,6 +76,18 @@ watch(
         const stillValid = filteredRakList.value.some((rak) => Number(rak.id) === Number(form.rak_id));
         if (!stillValid) {
             form.rak_id = '';
+            form.boks_id = '';
+        }
+    },
+);
+
+watch(
+    () => form.rak_id,
+    () => {
+        if (!form.boks_id) return;
+        const stillValid = filteredBoksList.value.some((boks) => Number(boks.id) === Number(form.boks_id));
+        if (!stillValid) {
+            form.boks_id = '';
         }
     },
 );
@@ -248,9 +267,9 @@ const submit = () => {
                 </div>
 
                 <div>
-                    <InputLabel for="rak_id" value="Rak Penyimpanan" />
-                    <select id="rak_id" v-model="form.rak_id" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm">
-                        <option value="">Belum ditempatkan</option>
+                    <InputLabel for="rak_id" value="Rak Penyimpanan *" />
+                    <select id="rak_id" v-model="form.rak_id" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm" required>
+                        <option value="" disabled>Pilih rak</option>
                         <option v-for="rak in filteredRakList" :key="rak.id" :value="rak.id">
                             {{ rak.kode_rak }} — No. {{ rak.nomor_rak || '—' }} · {{ rak.nama_rak }}
                         </option>
@@ -259,19 +278,17 @@ const submit = () => {
                     <InputError class="mt-1" :message="form.errors.rak_id" />
                 </div>
 
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                    <div>
-                        <InputLabel for="nomor_box" value="Nomor Box" />
-                        <TextInput id="nomor_box" v-model="form.nomor_box" class="mt-1 block w-full rounded-xl" placeholder="Contoh: B-01 atau Box-A" />
-                    </div>
-                    <div>
-                        <InputLabel for="nomor_map" value="Nomor Map" />
-                        <TextInput id="nomor_map" v-model="form.nomor_map" class="mt-1 block w-full rounded-xl" placeholder="Contoh: Map Merah 01" />
-                    </div>
-                    <div>
-                        <InputLabel for="nomor_slot" value="Nomor Slot" />
-                        <TextInput id="nomor_slot" v-model="form.nomor_slot" class="mt-1 block w-full rounded-xl" placeholder="Contoh: S-12" />
-                    </div>
+                <div>
+                    <InputLabel for="boks_id" value="Boks Penyimpanan *" />
+                    <select id="boks_id" v-model="form.boks_id" class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm" required>
+                        <option value="" disabled>{{ form.rak_id ? 'Pilih boks' : 'Pilih rak terlebih dahulu' }}</option>
+                        <option v-for="boks in filteredBoksList" :key="boks.id" :value="boks.id">
+                            {{ boks.kode_boks }} — Baris {{ boks.nomor_baris || '—' }} · Boks {{ boks.nomor_boks || '—' }}
+                        </option>
+                    </select>
+                    <p v-if="!form.rak_id" class="mt-1 text-xs text-slate-500">Pilih rak terlebih dahulu untuk menampilkan boks yang tersedia.</p>
+                    <p v-else-if="filteredBoksList.length === 0" class="mt-1 text-xs text-amber-600">Rak ini belum punya boks. Buat boks di menu Master Data → Boks terlebih dahulu.</p>
+                    <InputError class="mt-1" :message="form.errors.boks_id" />
                 </div>
 
                 <div>

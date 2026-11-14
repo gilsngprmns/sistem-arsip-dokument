@@ -4,7 +4,8 @@ use App\Http\Controllers\ArsipController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\BackupController;
 use App\Http\Controllers\HalamanPublikController;
-use App\Http\Controllers\LokasiArsipController;
+use App\Http\Controllers\BoksScanController;
+use App\Http\Controllers\BoksArsipController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\RakArsipController;
 use App\Http\Controllers\ReportController;
@@ -16,8 +17,8 @@ use App\Models\BerandaSlide;
 use App\Models\Faq;
 use App\Models\Manfaat;
 use App\Models\ActivityLog;
-use App\Models\LokasiArsip;
 use App\Models\RakArsip;
+use App\Models\BoksArsip;
 use App\Models\RiwayatSirkulasi;
 use App\Models\Seksi;
 use App\Models\User;
@@ -71,7 +72,7 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
         'dokumen_dipinjam' => (clone $documentQuery)->where('status_arsip', 'dipinjam')->count(),
         'dokumen_hilang' => (clone $documentQuery)->where('status_arsip', 'hilang')->count(),
         'total_user' => $isAdmin ? User::count() : User::where('seksi_id', $user->seksi_id)->count(),
-        'total_lokasi' => LokasiArsip::count(),
+        'total_boks' => BoksArsip::count(),
         'total_rak' => RakArsip::count(),
         'per_seksi' => ($isAdmin ? Seksi::query() : Seksi::query()->whereKey($user->seksi_id))
             ->withCount(['dokumenArsip', 'users'])
@@ -142,16 +143,16 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
     ];
 
     if ($isAdmin) {
-        $fullRacks = RakArsip::query()
+        $fullBoks = BoksArsip::query()
             ->where('is_active', true)
             ->withCount('dokumenArsip')
             ->get()
-            ->filter(fn ($rack) => ($rack->kapasitas ?? 200) > 0 && $rack->dokumen_arsip_count >= (($rack->kapasitas ?? 200) * 0.8))
+            ->filter(fn ($boks) => ($boks->kapasitas ?? 50) > 0 && $boks->dokumen_arsip_count >= (($boks->kapasitas ?? 50) * 0.8))
             ->count();
 
-        $notifications['rak_hampir_penuh'] = $fullRacks;
+        $notifications['boks_hampir_penuh'] = $fullBoks;
         $notifications['aktivitas_penting'] = ActivityLog::query()
-            ->whereIn('route_name', ['users.store', 'users.update', 'users.destroy', 'users.force-delete', 'backup.import'])
+            ->whereIn('route_name', ['users.store', 'users.update', 'users.destroy', 'users.force-delete', 'backup.import', 'backup.destroy-bulk'])
             ->where('created_at', '>=', now()->startOfDay())
             ->count();
     }
@@ -164,14 +165,14 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
             'total_seksi' => Seksi::count(),
             'dokumen_tanpa_lokasi' => DokumenArsip::whereNull('rak_id')->count(),
             'aktivitas_hari_ini' => ActivityLog::where('created_at', '>=', now()->startOfDay())->count(),
-            'rak_perhatian' => RakArsip::query()
+            'boks_perhatian' => BoksArsip::query()
                 ->where('is_active', true)
+                ->with(['rak:id,kode_rak', 'dokumenArsip'])
                 ->withCount('dokumenArsip')
-                ->with('lokasiArsip:id,nama_lokasi')
                 ->get()
-                ->filter(function ($rack) { $c = $rack->kapasitas ?? 200; return $c > 0 && $rack->dokumen_arsip_count >= ($c * 0.8); })
-                ->sortByDesc(function ($rack) { $c = $rack->kapasitas ?? 200; return $c > 0 ? $rack->dokumen_arsip_count / $c : 0; })
-                ->map(function ($r) { $c = $r->kapasitas ?? 200; return tap($r, fn ($r) => $r->pct = round(($r->dokumen_arsip_count / $c) * 100)); })
+                ->filter(function ($boks) { $c = $boks->kapasitas ?? 50; return $c > 0 && $boks->dokumen_arsip_count >= ($c * 0.8); })
+                ->sortByDesc(function ($boks) { $c = $boks->kapasitas ?? 50; return $c > 0 ? $boks->dokumen_arsip_count / $c : 0; })
+                ->map(function ($b) { $c = $b->kapasitas ?? 50; return tap($b, fn ($b) => $b->pct = round(($b->dokumen_arsip_count / $c) * 100)); })
                 ->take(5)
                 ->values(),
         ];
@@ -180,7 +181,7 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
     $recentDocuments = (clone $documentQuery)
         ->with(['seksi:id,nama_seksi', 'rak:id,kode_rak,nama_rak'])
         ->latest('created_at')
-        ->limit(6)
+        ->limit(5)
         ->get(['id', 'kode_arsip', 'perihal', 'status_arsip', 'seksi_id', 'rak_id', 'created_at']);
 
     $recentActivities = ActivityLog::query()
@@ -258,9 +259,14 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
     ]);
 })->middleware(['auth', 'active', 'verified'])->name('dashboard');
 
+// Halaman hasil scan QR boks — publik (tanpa auth) agar petugas HP bisa
+// akses langsung dari kamera tanpa login. Data ditampilkan = lokasi + dokumen.
+Route::get('/scan/boks/{kode_boks}', [BoksArsipController::class, 'showByKode'])
+    ->name('scan.boks');
+
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/scan', fn () => Inertia::render('Scan/Index'))->name('scan.index');
-    Route::get('arsip/export', [ArsipController::class, 'exportCsv'])->name('arsip.export');
+    Route::get('arsip/export', [ArsipController::class, 'exportExcel'])->name('arsip.export');
     Route::post('arsip/{arsip}/pinjam', [ArsipController::class, 'pinjam'])->name('arsip.pinjam');
     Route::post('arsip/{arsip}/kembalikan', [ArsipController::class, 'kembalikan'])->name('arsip.kembalikan');
     Route::post('arsip/{arsip}/settersedia', [ArsipController::class, 'settersedia'])->name('arsip.settersedia');
@@ -272,6 +278,8 @@ Route::middleware(['auth', 'active'])->group(function () {
     Route::resource('arsip', ArsipController::class);
     Route::post('/api/arsip/scan', [ArsipController::class, 'scanByKode'])
         ->name('arsip.scan');
+    Route::post('/api/boks/scan/{kode_boks}', [BoksScanController::class, '__invoke'])
+        ->name('boks.scan');
 
     Route::middleware('admin')->group(function () {
         // Daftar staf yang sedang online — dipanggil admin via polling ringan
@@ -293,6 +301,8 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::get('/backup/files/{file}', [BackupController::class, 'files'])->where(
             'file', 'backup-arsip-[0-9]{8}-[0-9]{6}\.(json|zip)'
         )->name('backup.files');
+        Route::post('/backup/destroy-bulk', [BackupController::class, 'destroyBulk'])
+            ->name('backup.destroy-bulk');
 
         Route::get('/users', [UserManagementController::class, 'index'])->name('users.index');
         Route::post('/users', [UserManagementController::class, 'store'])->name('users.store');
@@ -301,21 +311,25 @@ Route::middleware(['auth', 'active'])->group(function () {
         Route::post('/users/{user}/password', [UserManagementController::class, 'resetPassword'])->name('users.password');
         Route::delete('/users/{user}', [UserManagementController::class, 'destroy'])->name('users.destroy');
         Route::post('/users/{user}/force-delete', [UserManagementController::class, 'forceDelete'])->name('users.force-delete');
+        Route::post('/users/destroy-bulk', [UserManagementController::class, 'destroyBulk'])->name('users.destroy-bulk');
         Route::get('/activity-log', [ActivityLogController::class, 'index'])->name('activity.index');
-        Route::get('/reports/activity.csv', [ReportController::class, 'activity'])->name('reports.activity');
-        Route::get('/reports/users.csv', [ReportController::class, 'users'])->name('reports.users');
-        Route::get('/reports/racks.csv', [ReportController::class, 'racks'])->name('reports.racks');
-        Route::get('/reports/sections.csv', [ReportController::class, 'sections'])->name('reports.sections');
+        Route::get('/reports/activity', [ReportController::class, 'activityExcel'])->name('reports.activity');
+        Route::get('/reports/users', [ReportController::class, 'usersExcel'])->name('reports.users');
+        Route::get('/reports/racks', [ReportController::class, 'racksExcel'])->name('reports.racks');
+        Route::get('/reports/sections', [ReportController::class, 'sectionsExcel'])->name('reports.sections');
 
-        Route::get('/lokasi', fn () => redirect()->route('rak.index'))->name('lokasi.redirect');
-        Route::post('/lokasi', [LokasiArsipController::class, 'store'])->name('lokasi.store');
-        Route::put('/lokasi/{lokasi}', [LokasiArsipController::class, 'update'])->name('lokasi.update');
-        Route::delete('/lokasi/{lokasi}', [LokasiArsipController::class, 'destroy'])->name('lokasi.destroy');
+        Route::get('/boks', [BoksArsipController::class, 'index'])->name('boks.index');
+        Route::post('/boks', [BoksArsipController::class, 'store'])->name('boks.store');
+        Route::put('/boks/{boks}', [BoksArsipController::class, 'update'])->name('boks.update');
+        Route::delete('/boks/{boks}', [BoksArsipController::class, 'destroy'])->name('boks.destroy');
+        Route::get('/boks/{boks}/qr', [BoksArsipController::class, 'qr'])->name('boks.qr');
+        Route::post('/boks/destroy-bulk', [BoksArsipController::class, 'destroyBulk'])->name('boks.destroy-bulk');
 
         Route::get('/rak', [RakArsipController::class, 'index'])->name('rak.index');
         Route::post('/rak', [RakArsipController::class, 'store'])->name('rak.store');
         Route::put('/rak/{rak}', [RakArsipController::class, 'update'])->name('rak.update');
         Route::delete('/rak/{rak}', [RakArsipController::class, 'destroy'])->name('rak.destroy');
+        Route::post('/rak/destroy-bulk', [RakArsipController::class, 'destroyBulk'])->name('rak.destroy-bulk');
 
         // Halaman Publik — kelola konten 4 halaman situs dari admin
         Route::get('/halaman-publik/beranda', [HalamanPublikController::class, 'beranda'])->name('halaman-publik.beranda');

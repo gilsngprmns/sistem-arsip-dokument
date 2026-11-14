@@ -2,91 +2,72 @@
 
 namespace App\Http\Controllers;
 
+use App\Exports\ActivityLogExport;
+use App\Exports\RackExport;
+use App\Exports\SectionSummaryExport;
+use App\Exports\UserExport;
 use App\Models\ActivityLog;
 use App\Models\RakArsip;
 use App\Models\Seksi;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Symfony\Component\HttpFoundation\StreamedResponse;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ReportController extends Controller
 {
     /**
-     * Ekspor log aktivitas — mengikuti filter query string yang sama
+     * Ekspor log aktivitas ke Excel — mengikuti filter query string yang sama
      * dengan halaman /activity-log (tanpa filter = seluruh log).
      */
-    public function activity(Request $request): StreamedResponse
+    public function activityExcel(Request $request)
     {
-        return $this->csv('laporan-aktivitas', ['waktu', 'pengguna', 'aksi', 'keterangan', 'target', 'ip'], function ($handle) use ($request): void {
-            ActivityLog::query()->with('user:id,name')
-                ->whereNotIn('route_name', ['password.request', 'password.otp.send', 'password.otp.verify', 'password.otp.reset', 'password.confirm', 'verification.send'])
-                ->filterByRequest($request)->latest()->chunk(200, function ($rows) use ($handle): void {
-                foreach ($rows as $row) {
-                    // Zona Asia/Jakarta agar konsisten dengan tampilan halaman
-                    $waktu = $row->created_at?->copy()->setTimezone('Asia/Jakarta')->format('d M Y, H.i.s') ?? '';
-                    $target = filled($row->target_type) ? $row->target_type.': '.($row->target_label ?? '') : '';
-                    fputcsv($handle, [$waktu, $this->escCsv($row->user?->name ?? 'Sistem'), $row->action, $this->escCsv($row->description), $this->escCsv($target), $row->ip_address], ';');
-                }
-            });
-        });
+        $activities = ActivityLog::query()->with('user:id,name')
+            ->whereNotIn('route_name', ['password.request', 'password.otp.send', 'password.otp.verify', 'password.otp.reset', 'password.confirm', 'verification.send'])
+            ->filterByRequest($request)
+            ->latest()
+            ->get();
+
+        return Excel::download(
+            new ActivityLogExport($activities),
+            'laporan-aktivitas-'.now()->format('Ymd-His').'.xlsx',
+        );
     }
 
-    public function users(): StreamedResponse
+    public function usersExcel()
     {
-        return $this->csv('laporan-user', ['nama', 'email', 'role', 'seksi', 'status', 'dibuat'], function ($handle): void {
-            User::query()->with('seksi:id,nama_seksi')->orderBy('name')->chunk(200, function ($rows) use ($handle): void {
-                foreach ($rows as $row) {
-                    fputcsv($handle, [$row->name, $row->email, $row->role, $row->seksi?->nama_seksi ?? 'Tanpa seksi', $row->is_active ? 'Aktif' : 'Nonaktif', $row->created_at], ';');
-                }
-            });
-        });
+        $users = User::query()->with('seksi:id,nama_seksi')->orderBy('name')->get();
+
+        return Excel::download(
+            new UserExport($users),
+            'laporan-user-'.now()->format('Ymd-His').'.xlsx',
+        );
     }
 
-    public function racks(): StreamedResponse
+    public function racksExcel()
     {
-        return $this->csv('laporan-rak', ['kode rak', 'nama rak', 'lokasi', 'jumlah arsip', 'kapasitas', 'status'], function ($handle): void {
-            RakArsip::query()->with('lokasiArsip:id,nama_lokasi')->withCount('dokumenArsip')->orderBy('kode_rak')->chunk(200, function ($rows) use ($handle): void {
-                foreach ($rows as $row) {
-                    fputcsv($handle, [$row->kode_rak, $row->nama_rak, $row->lokasiArsip?->nama_lokasi ?? 'Tanpa lokasi', $row->dokumen_arsip_count, $row->kapasitas ?? 200, $row->is_active ? 'Aktif' : 'Nonaktif'], ';');
-                }
-            });
-        });
+        $racks = RakArsip::query()
+            ->withCount('dokumenArsip')
+            ->orderBy('kode_rak')
+            ->get();
+
+        return Excel::download(
+            new RackExport($racks),
+            'laporan-rak-'.now()->format('Ymd-His').'.xlsx',
+        );
     }
 
-    public function sections(): StreamedResponse
+    public function sectionsExcel()
     {
-        return $this->csv('laporan-rekap-seksi', ['seksi', 'jumlah arsip', 'tersedia', 'dipinjam', 'jumlah user'], function ($handle): void {
-            Seksi::query()->withCount(['dokumenArsip', 'users'])->withCount(['dokumenArsip as tersedia_count' => fn ($query) => $query->where('status_arsip', 'tersedia')])->withCount(['dokumenArsip as dipinjam_count' => fn ($query) => $query->where('status_arsip', 'dipinjam')])->orderByOrganisasi()->chunk(200, function ($rows) use ($handle): void {
-                foreach ($rows as $row) {
-                    fputcsv($handle, [$row->nama_seksi, $row->dokumen_arsip_count, $row->tersedia_count, $row->dipinjam_count, $row->users_count], ';');
-                }
-            });
-        });
-    }
+        $sections = Seksi::query()
+            ->withCount(['dokumenArsip', 'users'])
+            ->withCount(['dokumenArsip as tersedia_count' => fn ($query) => $query->where('status_arsip', 'tersedia')])
+            ->withCount(['dokumenArsip as dipinjam_count' => fn ($query) => $query->where('status_arsip', 'dipinjam')])
+            ->orderByOrganisasi()
+            ->get();
 
-    private function csv(string $name, array $headers, callable $writer): StreamedResponse
-    {
-        return response()->streamDownload(function () use ($headers, $writer): void {
-            $handle = fopen('php://output', 'w');
-            fprintf($handle, chr(0xEF).chr(0xBB).chr(0xBF));
-            fputcsv($handle, $headers, ';');
-            $writer($handle);
-            fclose($handle);
-        }, $name.'-'.now()->format('Ymd-His').'.csv', ['Content-Type' => 'text/csv; charset=UTF-8']);
-    }
-
-    /**
-     * Cegah serangan CSV injection: nilai yang diawali formula ( = + - @ )
-     * diberi prefix kutip tunggal agar tidak dieksekusi spreadsheet.
-     */
-    private function escCsv(?string $value): string
-    {
-        if (! strlen($value ?? '')) {
-            return $value ?? '';
-        }
-        if ($value[0] === '=' || $value[0] === '+' || $value[0] === '-' || $value[0] === '@') {
-            return "'{$value}";
-        }
-        return $value;
+        return Excel::download(
+            new SectionSummaryExport($sections),
+            'laporan-rekap-seksi-'.now()->format('Ymd-His').'.xlsx',
+        );
     }
 }

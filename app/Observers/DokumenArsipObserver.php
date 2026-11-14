@@ -2,6 +2,7 @@
 
 namespace App\Observers;
 
+use App\Models\BoksArsip;
 use App\Models\DokumenArsip;
 use Illuminate\Support\Facades\Storage;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -25,17 +26,32 @@ class DokumenArsipObserver
      */
     public function updated(DokumenArsip $arsip): void
     {
-        if (! $arsip->wasChanged('kode_arsip')) {
-            return;
+        if ($arsip->wasChanged('kode_arsip')) {
+            $this->deleteQrFile($arsip->getOriginal('qr_code_path'));
+            $path = $this->storeQrImage($arsip->kode_arsip);
+            $arsip->updateQuietly(['qr_code_path' => $path]);
         }
 
-        $this->deleteQrFile($arsip->getOriginal('qr_code_path'));
+        // Regenerate boks QR when document is placed in or moved between boks
+        $this->regenerateBoksQr($arsip);
+    }
 
-        $path = $this->storeQrImage($arsip->kode_arsip);
+    /**
+     * Regenerate boks QR jika dokumen pertama masuk ke boks,
+     * atau dipindahkan dari satu boks ke boks lain.
+     */
+    protected function regenerateBoksQr(DokumenArsip $arsip): void
+    {
+        $newBoksId = $arsip->boks_id;
+        $oldBoksId = $arsip->getOriginal('boks_id');
 
-        $arsip->updateQuietly([
-            'qr_code_path' => $path,
-        ]);
+        $boksIds = array_filter([$oldBoksId, $newBoksId], fn ($id) => $id !== null);
+        foreach ($boksIds as $boksId) {
+            $boks = BoksArsip::find($boksId);
+            if ($boks) {
+                app(BoksArsipObserver::class)->ensureQr($boks);
+            }
+        }
     }
 
     /**
@@ -46,6 +62,13 @@ class DokumenArsipObserver
         $this->deleteQrFile($arsip->qr_code_path);
         if ($arsip->file_path) {
             Storage::disk('public')->delete($arsip->file_path);
+        }
+        // Regenerate boks QR (still valid — QR is the same regardless of content)
+        if ($arsip->boks_id) {
+            $boks = BoksArsip::find($arsip->boks_id);
+            if ($boks) {
+                app(BoksArsipObserver::class)->ensureQr($boks);
+            }
         }
     }
 

@@ -14,6 +14,10 @@ const props = defineProps({
         type: String,
         default: 'py-1 bg-white',
     },
+    autoFlip: {
+        type: Boolean,
+        default: false,
+    },
 });
 
 const closeOnEscape = (e) => {
@@ -32,6 +36,21 @@ const widthClass = computed(() => {
 });
 
 const alignmentClasses = computed(() => {
+    const edge =
+        props.align === 'left'
+            ? 'start-0'
+            : props.align === 'right'
+                ? 'end-0'
+                : '';
+    if (dropUp.value) {
+        const origin =
+            props.align === 'left'
+                ? 'ltr:origin-bottom-left rtl:origin-bottom-right'
+                : props.align === 'right'
+                    ? 'ltr:origin-bottom-right rtl:origin-bottom-left'
+                    : 'origin-bottom';
+        return `${edge} ${origin}`.trim();
+    }
     if (props.align === 'left') {
         return 'ltr:origin-top-left rtl:origin-top-right start-0';
     } else if (props.align === 'right') {
@@ -42,11 +61,27 @@ const alignmentClasses = computed(() => {
 });
 
 const open = ref(false);
+const dropUp = ref(false);
+const triggerRef = ref(null);
+
+// Perkiraan tinggi menu (2-3 item + padding + gap) untuk cek muat tidak di viewport
+const EST_MENU_HEIGHT = 200;
+
+const measure = () => {
+    if (!props.autoFlip || !triggerRef.value) return;
+    const rect = triggerRef.value.getBoundingClientRect();
+    dropUp.value = rect.bottom + EST_MENU_HEIGHT > window.innerHeight;
+};
+
+const toggle = () => {
+    measure();
+    open.value = !open.value;
+};
 </script>
 
 <template>
     <div class="relative">
-        <div @click="open = !open">
+        <div ref="triggerRef" @click="toggle">
             <slot name="trigger" />
         </div>
 
@@ -54,7 +89,7 @@ const open = ref(false);
         <div
             v-show="open"
             class="fixed inset-0 z-40"
-            @click="open = false"
+            @click="toggle"
         ></div>
 
         <Transition
@@ -67,8 +102,8 @@ const open = ref(false);
         >
             <div
                 v-show="open"
-                class="absolute z-50 mt-2 rounded-md shadow-lg"
-                :class="[widthClass, alignmentClasses]"
+                class="absolute z-50 rounded-md shadow-lg"
+                :class="[dropUp ? 'bottom-full mb-2' : 'mt-2', widthClass, alignmentClasses]"
                 style="display: none"
                 @click="open = false"
             >

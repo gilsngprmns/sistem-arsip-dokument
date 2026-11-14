@@ -44,9 +44,13 @@ onBeforeUnmount(() => {
                 class="relative hidden overflow-hidden bg-brand-navy px-10 py-10 text-white lg:flex lg:flex-col lg:h-full lg:justify-between xl:px-16"
             >
                 <div class="relative flex flex-col items-start gap-3 motion-safe:animate-pulse">
-                    <div class="h-11 w-11 rounded-xl bg-slate-600" />
-                    <div class="h-6 w-44 rounded bg-slate-600" />
-                    <div class="h-4 w-56 rounded bg-slate-500" />
+                    <div class="flex items-center gap-3">
+                        <div class="h-11 w-11 rounded-xl bg-slate-600" />
+                        <div class="space-y-1.5">
+                            <div class="h-4 w-44 rounded bg-slate-600" />
+                            <div class="h-3 w-52 rounded bg-slate-500" />
+                        </div>
+                    </div>
                 </div>
                 <!-- Skeleton badge -->
                 <div class="relative motion-safe:animate-pulse">
@@ -55,23 +59,33 @@ onBeforeUnmount(() => {
                         <div class="h-3 w-28 rounded bg-slate-600" />
                     </div>
                 </div>
-                <div class="relative max-w-md motion-safe:animate-pulse">
+                <div class="relative flex flex-1 flex-col items-center justify-center text-center motion-safe:animate-pulse">
                     <div class="h-4 w-40 rounded bg-slate-600" />
-                    <div class="h-7 w-52 rounded bg-slate-500 mt-3" />
-                    <div class="space-y-2 pt-3">
-                        <div class="h-3.5 w-full rounded bg-slate-500" />
-                        <div class="h-3.5 w-3/4 rounded bg-slate-500" />
+                    <div class="mt-4 space-y-2.5">
+                        <div class="h-7 w-56 rounded bg-slate-500" />
+                        <div class="h-7 w-48 rounded bg-slate-500" />
+                    </div>
+                    <div class="mt-4 space-y-2">
+                        <div class="h-4 w-48 rounded bg-slate-500/70" />
+                        <div class="h-4 w-36 rounded bg-slate-500/70" />
                     </div>
                 </div>
                 <!-- Skeleton footer -->
-                <div class="relative mt-auto pt-8 border-t border-slate-700/50 space-y-3 pb-4 motion-safe:animate-pulse">
-                    <div class="flex items-center gap-1.5">
-                        <div class="w-3 h-3 rounded bg-slate-600" />
-                        <div class="h-3 w-28 rounded bg-slate-600" />
+                <div class="relative mt-auto flex flex-col gap-3 pt-8 border-t border-slate-700/50 motion-safe:animate-pulse">
+                    <div class="space-y-2">
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-3 h-3 rounded bg-slate-600" />
+                            <div class="h-2.5 w-28 rounded bg-slate-600" />
+                        </div>
+                        <div class="space-y-1.5">
+                            <div class="h-2.5 w-full rounded bg-slate-500/70" />
+                            <div class="h-2.5 w-full rounded bg-slate-500/70" />
+                            <div class="h-2.5 w-full rounded bg-slate-500/70" />
+                            <div class="h-2.5 w-2/3 rounded bg-slate-500/70" />
+                        </div>
                     </div>
-                    <div class="h-3 w-full rounded bg-slate-500" />
-                    <div class="h-3 w-48 rounded bg-slate-500" />
-                    <div class="h-3 w-40 rounded bg-slate-500" />
+                    <div class="h-2.5 w-48 rounded bg-slate-500/70" />
+                    <div class="h-2.5 w-36 rounded bg-slate-500/70" />
                 </div>
             </aside>
 
@@ -174,8 +188,9 @@ onBeforeUnmount(() => {
                 <div class="flex justify-end">
                     <Link
                         href="/"
-                        class="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-semibold text-slate-500 transition duration-200 hover:text-brand-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
+                        class="inline-flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-semibold text-slate-500 transition duration-200 hover:text-brand-blue focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-blue/40"
                     >
+                        <AppIcon name="home" :size="16" :stroke-width="2" class="text-slate-500" decorative />
                         Beranda
                     </Link>
                 </div>

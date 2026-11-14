@@ -37,7 +37,7 @@ const iconBtn =
             <AppIcon name="edit" :size="16" :stroke-width="1.8" class="h-4 w-4" decorative />
         </button>
 
-        <Dropdown v-if="showOverflow" align="right" width="48">
+        <Dropdown v-if="showOverflow" align="right" width="48" auto-flip>
             <template #trigger>
                 <button
                     type="button"

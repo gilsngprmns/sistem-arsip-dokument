@@ -72,9 +72,9 @@ const actionMap = {
     'rak.store': 'Tambah rak',
     'rak.update': 'Perbarui rak',
     'rak.destroy': 'Nonaktifkan rak',
-    'lokasi.store': 'Tambah lokasi',
-    'lokasi.update': 'Perbarui lokasi',
-    'lokasi.destroy': 'Nonaktifkan lokasi',
+    'boks.store': 'Tambah boks',
+    'boks.update': 'Perbarui boks',
+    'boks.destroy': 'Nonaktifkan boks',
     'beranda.slides.store': 'Tambah slide beranda',
     'beranda.slides.destroy': 'Hapus slide beranda',
     'manfaat.store': 'Tambah kartu manfaat',
@@ -88,6 +88,9 @@ const actionMap = {
     'faq.destroy': 'Hapus FAQ bantuan',
     'auth.login': 'Login',
     'auth.logout': 'Logout',
+    'password.otp.send': 'Aktivitas pemulihan kata sandi',
+    'password.otp.verify': 'Verifikasi pemulihan kata sandi',
+    'password.otp.finish': 'Selesai ganti kata sandi',
     // GET — halaman utama
     'dashboard': 'Dashboard',
     'arsip.index': 'Daftar arsip',
@@ -95,7 +98,7 @@ const actionMap = {
     'arsip.create': 'Rekam berkas baru',
     'arsip.edit': 'Edit arsip',
     'rak.index': 'Daftar rak',
-    'lokasi.redirect': 'Daftar lokasi',
+    'boks.index': 'Daftar boks',
     'scan.index': 'Pindai QR',
     'profile.edit': 'Profil',
     'halaman-publik.beranda': 'Foto Carousel',
@@ -133,6 +136,12 @@ const actionBadge = (activity) => {
     if (key === 'auth.login' || key === 'auth.logout') {
         return 'bg-sky-50 text-sky-800 ring-sky-300';
     }
+    if (key === 'password.otp.finish') {
+        return 'bg-emerald-50 text-emerald-800 ring-emerald-300';
+    }
+    if (key === 'password.otp.send' || key === 'password.otp.verify') {
+        return 'bg-violet-50 text-violet-800 ring-violet-300';
+    }
     const suffix = key.split('.').pop();
     if (suffix === 'store' || key === 'arsip.kembalikan' || key === 'arsip.settersedia' || key === 'users.activate') {
         return 'bg-emerald-50 text-emerald-800 ring-emerald-300'; // tambah / pengembalian
@@ -147,7 +156,7 @@ const actionBadge = (activity) => {
 };
 
 // --- Target di kolom Keterangan ---
-const targetPrefix = { dokumen: 'Dokumen', user: 'User', rak: 'Rak', lokasi: 'Lokasi', halaman_publik: 'Halaman Publik' };
+const targetPrefix = { dokumen: 'Dokumen', user: 'User', rak: 'Rak', boks: 'Boks', halaman_publik: 'Halaman Publik' };
 
 // Baris hapus/permanen: objek kemungkinan sudah tidak ada → jangan di-link
 const targetGone = (activity) =>
@@ -330,8 +339,8 @@ const applyShortcut = (days) => {
     applyFilters();
 };
 
-// --- Unduh CSV mengikuti filter aktif ---
-const csvUrl = computed(() => {
+// --- Ekspor Excel mengikuti filter aktif ---
+const excelUrl = computed(() => {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(localFilters.value)) {
         if (value) params.set(key, value);
@@ -348,7 +357,7 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
 </script>
 
 <template>
-    <Head title="Log Activity" />
+    <Head title="Log Aktivitas" />
     <AppLayout>
         <template #skeleton-header>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -381,7 +390,7 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
         <template #header>
             <div class="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div class="flex flex-wrap items-center gap-3">
-                    <h1 class="text-2xl font-bold text-slate-900">Log Activity</h1>
+                    <h1 class="text-2xl font-bold text-slate-900">Log Aktivitas</h1>
                     <p class="text-sm text-slate-500">Riwayat aktivitas pengguna dan sistem.</p>
                     <!-- Live badge (admin-only) -->
                     <span
@@ -403,12 +412,12 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
                         Diperbarui {{ lastPolledLabel }}
                     </p>
                     <a
-                        :href="csvUrl"
-                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-600 shadow-sm hover:bg-slate-50 sm:flex-none"
+                        :href="excelUrl"
+                        class="inline-flex flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 sm:flex-none"
                         title="Unduh log aktivitas sesuai filter aktif"
                     >
-                        <AppIcon name="download" :size="16" :stroke-width="1.8" class="h-4 w-4" decorative />
-                        Unduh CSV
+                        <AppIcon name="excel" :size="16" :stroke-width="1.8" class="h-4 w-4" decorative />
+                        Ekspor Excel
                     </a>
                 </div>
             </div>
@@ -510,11 +519,11 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
                 <table class="min-w-full text-left text-sm">
                     <thead>
                         <tr class="border-b border-slate-200 text-slate-600">
-                            <th class="px-3 py-3 font-semibold">Waktu</th>
-                            <th class="px-3 py-3 font-semibold">Pengguna</th>
-                            <th class="px-3 py-3 font-semibold">Aksi</th>
-                            <th class="px-3 py-3 font-semibold">Keterangan</th>
-                            <th class="px-3 py-3 font-semibold">IP</th>
+                            <th class="px-3 py-3 font-semibold text-center">Waktu</th>
+                            <th class="px-3 py-3 font-semibold text-center">Pengguna</th>
+                            <th class="px-3 py-3 font-semibold text-center">Aksi</th>
+                            <th class="px-3 py-3 font-semibold text-center">Keterangan</th>
+                            <th class="px-3 py-3 font-semibold text-center">IP</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -524,19 +533,19 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
                             class="border-b border-slate-100"
                             :class="liveActivities.some(a => a.id === activity.id) ? 'bg-emerald-50/40' : ''"
                         >
-                            <td class="whitespace-nowrap px-3 py-3 text-slate-600">{{ formatDateTime(activity.created_at) }}</td>
-                            <td class="px-3 py-3">
+                            <td class="whitespace-nowrap px-3 py-3 text-center text-slate-600">{{ formatDateTime(activity.created_at) }}</td>
+                            <td class="px-3 py-3 text-center">
                                 <div class="font-medium text-slate-800">{{ activity.user?.name || 'Sistem' }}</div>
                                 <div class="text-xs uppercase text-slate-400">{{ activity.user?.role || '' }}</div>
                                 <div v-if="activity.user?.email" class="text-xs text-slate-500 truncate max-w-[14rem]">{{ activity.user.email }}</div>
                             </td>
-                            <td class="px-3 py-3">
+                            <td class="px-3 py-3 text-center">
                                 <span
                                     class="inline-flex rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset"
                                     :class="actionBadge(activity)"
                                 >{{ actionLabel(activity) }}</span>
                             </td>
-                            <td class="px-3 py-3">
+                            <td class="px-3 py-3 text-center">
                                 <div v-if="targetLine(activity)" class="text-xs">
                                     <template v-if="targetLine(activity).href">
                                         <Link
@@ -556,7 +565,7 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
                                     {{ d.label }}: {{ d.old }} → {{ d.new }}
                                 </div>
                             </td>
-                            <td class="px-3 py-3 text-slate-500">{{ activity.ip_address || '—' }}</td>
+                            <td class="px-3 py-3 text-center text-slate-500">{{ activity.ip_address || '—' }}</td>
                         </tr>
                         <tr v-if="!allActivities.length">
                             <td colspan="5" class="px-3 py-10 text-center text-sm leading-7 text-slate-500">

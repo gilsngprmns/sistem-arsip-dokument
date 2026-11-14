@@ -1,16 +1,85 @@
 <script setup>
 import BackLink from '@/Components/BackLink.vue';
+import ArsipFormModal from '@/Components/ArsipFormModal.vue';
 import SirkulasiModal from '@/Components/SirkulasiModal.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link } from '@inertiajs/vue3';
-import { computed, ref } from 'vue';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
     arsip: {
         type: Object,
         required: true,
     },
+    seksiList: {
+        type: Array,
+        default: () => [],
+    },
+    rakList: {
+        type: Array,
+        default: () => [],
+    },
+    boksList: {
+        type: Array,
+        default: () => [],
+    },
+    previousUrl: {
+        type: String,
+        default: '',
+    },
 });
+
+const page = usePage();
+const showEditModal = ref(false);
+const editingArsip = ref(null);
+
+// Flash messages
+const flashSuccess = computed(() => page.props.flash?.success);
+const flashVisible = ref(false);
+let flashTimer = null;
+
+watch(
+    () => page.props.flash?.success,
+    (v) => {
+        clearTimeout(flashTimer);
+        if (v) {
+            flashVisible.value = true;
+            flashTimer = setTimeout(() => { flashVisible.value = false; }, 5000);
+        }
+    },
+    { immediate: true },
+);
+
+const flashDanger = computed(() => page.props.flash?.danger);
+const flashDangerVisible = ref(false);
+let flashDangerTimer = null;
+
+watch(
+    () => page.props.flash?.danger,
+    (v) => {
+        clearTimeout(flashDangerTimer);
+        if (v) {
+            flashDangerVisible.value = true;
+            flashDangerTimer = setTimeout(() => { flashDangerVisible.value = false; }, 5000);
+        }
+    },
+    { immediate: true },
+);
+
+onUnmounted(() => {
+    clearTimeout(flashTimer);
+    clearTimeout(flashDangerTimer);
+});
+
+const openEdit = () => {
+    editingArsip.value = props.arsip;
+    showEditModal.value = true;
+};
+
+const onEditSaved = () => {
+    // Reload halaman Show dengan menyertakan flash props agar notifikasi muncul
+    router.reload({ only: ['arsip', 'flash'] });
+};
 
 const showSirkulasiModal = ref(false);
 const sirkulasiMode = ref('pinjam');
@@ -94,7 +163,7 @@ const statusBadge = computed(() => {
 });
 
 const hasPosisiDetail = computed(() =>
-    Boolean(props.arsip.nomor_box || props.arsip.nomor_map || props.arsip.nomor_slot),
+    Boolean(props.arsip.boks?.kode_boks || props.arsip.boks?.nomor_baris || props.arsip.boks?.nomor_boks),
 );
 
 const identitasFields = computed(() => {
@@ -114,18 +183,18 @@ const penyimpananFields = computed(() => {
         rows.push({
             label: 'Rak Penyimpanan',
             value: props.arsip.rak.kode_rak,
-            hint: props.arsip.rak.lokasiArsip?.nama_lokasi || null,
+            hint: null,
         });
     }
 
-    if (hasPosisiDetail.value) {
+    if (props.arsip.boks) {
         rows.push({
-            label: 'Posisi Detail',
-            value: [
-                props.arsip.nomor_box ? `Box ${props.arsip.nomor_box}` : null,
-                props.arsip.nomor_map ? `Map ${props.arsip.nomor_map}` : null,
-                props.arsip.nomor_slot ? `Slot ${props.arsip.nomor_slot}` : null,
-            ].filter(Boolean).join(' / '),
+            label: 'Boks Penyimpanan',
+            value: props.arsip.boks.kode_boks,
+            hint: [
+                props.arsip.boks.nomor_baris ? `Baris ${props.arsip.boks.nomor_baris}` : null,
+                props.arsip.boks.nomor_boks ? `Boks ${props.arsip.boks.nomor_boks}` : null,
+            ].filter(Boolean).join(' · ') || null,
         });
     }
 
@@ -183,6 +252,21 @@ const openKembalikan = () => {
     <Head :title="`Arsip ${arsip.kode_arsip}`" />
 
     <AppLayout>
+        <!-- Flash notifications -->
+        <div
+            v-if="flashSuccess && flashVisible"
+            class="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800"
+        >
+            {{ flashSuccess }}
+        </div>
+
+        <div
+            v-if="flashDanger && flashDangerVisible"
+            class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800"
+        >
+            {{ flashDanger }}
+        </div>
+
         <template #skeleton-header>
             <div class="flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0 flex-1">
@@ -243,7 +327,7 @@ const openKembalikan = () => {
                         {{ arsip.perihal || arsip.nomor_surat || 'Detail dokumen arsip' }}
                     </p>
                 </div>
-                <BackLink class="shrink-0" :href="route('arsip.index')" />
+                <BackLink class="shrink-0" :use-history="true" />
             </div>
         </template>
 
@@ -296,12 +380,13 @@ const openKembalikan = () => {
                 </section>
 
                 <div class="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
-                    <Link
-                        :href="route('arsip.edit', arsip.id)"
+                    <button
+                        type="button"
                         class="inline-flex rounded-xl bg-brand-blue px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                        @click="openEdit"
                     >
                         Edit
-                    </Link>
+                    </button>
                     <button
                         v-if="arsip.status_arsip === 'tersedia'"
                         type="button"
@@ -378,5 +463,16 @@ const openKembalikan = () => {
         :arsip="arsip"
         :mode="sirkulasiMode"
         @close="showSirkulasiModal = false"
+    />
+
+    <ArsipFormModal
+        :show="showEditModal"
+        mode="edit"
+        :seksi-list="seksiList"
+        :rak-list="rakList"
+        :boks-list="boksList"
+        :initial-data="editingArsip"
+        :on-finish="onEditSaved"
+        @close="showEditModal = false"
     />
 </template>

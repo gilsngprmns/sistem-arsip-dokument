@@ -16,6 +16,16 @@ class User extends Authenticatable
     use HasFactory, Notifiable;
 
     /**
+     * Batas maksimum percobaan login sebelum akun diblokir otomatis.
+     */
+    public const MAX_LOGIN_ATTEMPTS = 5;
+
+    /**
+     * Pesan standar penolakan login untuk akun nonaktif / terkunci.
+     */
+    public const LOCKED_ACCOUNT_MESSAGE = 'Akun Anda telah dinonaktifkan karena alasan keamanan. Silakan hubungi Admin Tata Usaha untuk pemulihan.';
+
+    /**
      * The attributes that are mass assignable.
      *
      * @var list<string>
@@ -28,6 +38,7 @@ class User extends Authenticatable
         'seksi_id',
         'role',
         'is_active',
+        'login_attempts',
     ];
 
     /**
@@ -51,6 +62,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'login_attempts' => 'integer',
         ];
     }
 

@@ -7,7 +7,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { institution } from '@/config/institution';
 import { Head, Link, useForm } from '@inertiajs/vue3';
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 defineProps({
     canResetPassword: {
@@ -31,6 +31,10 @@ const submit = () => {
         onFinish: () => form.reset('password'),
     });
 };
+
+const isLockedOut = computed(() =>
+    (form.errors.email ?? '').toLowerCase().includes('dinonaktifkan'),
+);
 </script>
 
 <template>
@@ -39,23 +43,37 @@ const submit = () => {
 
         <!-- Skeleton khusus form login (slot #skeleton milik GuestLayout) -->
         <template #skeleton>
-            <div class="mb-8 flex items-center gap-3">
-                <div class="h-7 w-36 rounded bg-slate-200" />
-                <div class="h-4 w-24 rounded bg-slate-100" />
+            <div class="mb-8 flex items-center gap-3 lg:hidden">
+                <div class="h-10 w-10 rounded-xl bg-slate-200" />
+                <div class="space-y-1.5">
+                    <div class="h-4 w-44 rounded bg-slate-200" />
+                    <div class="h-3 w-56 rounded bg-slate-100" />
+                </div>
+            </div>
+            <div class="mb-8">
+                <div class="h-6 w-40 rounded bg-slate-200" />
             </div>
             <div class="space-y-5">
                 <div class="space-y-2">
-                    <div class="h-4 w-28 rounded bg-slate-200" />
-                    <div class="h-10 w-full rounded-lg bg-slate-100" />
+                    <div class="h-4 w-24 rounded bg-slate-200" />
+                    <div class="h-11 w-full rounded-lg bg-slate-100" />
                 </div>
                 <div class="space-y-2">
-                    <div class="h-4 w-28 rounded bg-slate-200" />
-                    <div class="h-10 w-full rounded-lg bg-slate-100" />
+                    <div class="flex items-center justify-between">
+                        <div class="h-4 w-20 rounded bg-slate-200" />
+                        <div class="h-4 w-20 rounded bg-slate-100" />
+                    </div>
+                    <div class="h-11 w-full rounded-lg bg-slate-100" />
                 </div>
-                <div class="h-4 w-36 rounded bg-slate-200" />
-                <div class="h-10 w-full rounded-lg bg-slate-100" />
-                <div class="h-4 w-48 rounded bg-slate-100" />
+                <div class="flex min-h-11 items-center gap-2">
+                    <div class="h-5 w-5 rounded bg-slate-200" />
+                    <div class="h-4 w-32 rounded bg-slate-100" />
+                </div>
+                <div class="pt-2">
+                    <div class="h-11 w-full rounded-lg bg-slate-200" />
+                </div>
             </div>
+            <div class="mt-8 h-4 w-48 rounded bg-slate-100" />
         </template>
 
         <div v-reveal class="mb-8">
@@ -74,6 +92,18 @@ const submit = () => {
             {{ status }}
         </div>
 
+        <div
+            v-if="isLockedOut"
+            class="mb-4 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800"
+            role="alert"
+        >
+            <AppIcon name="lock" :size="18" :stroke-width="1.8" class="mt-0.5 shrink-0" decorative />
+            <span>
+                <strong class="font-semibold">Akun terkunci permanen.</strong>
+                {{ form.errors.email }}
+            </span>
+        </div>
+
         <form v-reveal :style="{ transitionDelay: '150ms' }" class="space-y-5" @submit.prevent="submit">
             <div>
                 <InputLabel for="email" value="Alamat email" class="text-slate-700" />
@@ -88,7 +118,8 @@ const submit = () => {
                     autocomplete="username"
                 />
 
-                <InputError class="mt-2" :message="form.errors.email" />
+                <!-- Pesan akun dinonaktifkan sudah tampil di alert merah di atas form -->
+                <InputError v-if="!isLockedOut" class="mt-2" :message="form.errors.email" />
             </div>
 
             <div>

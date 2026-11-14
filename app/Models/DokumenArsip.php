@@ -26,9 +26,7 @@ class DokumenArsip extends Model
         'tujuan_instansi',
         'seksi_id',
         'rak_id',
-        'nomor_box',
-        'nomor_map',
-        'nomor_slot',
+        'boks_id',
         'keterangan_posisi',
         'file_path',
         'qr_code_path',
@@ -36,6 +34,7 @@ class DokumenArsip extends Model
         'batas_pengembalian',
         'dicatat_oleh',
         'catatan',
+        'deleted_at',
     ];
 
     protected function casts(): array
@@ -60,6 +59,11 @@ class DokumenArsip extends Model
     public function rak(): BelongsTo
     {
         return $this->belongsTo(RakArsip::class, 'rak_id');
+    }
+
+    public function boks(): BelongsTo
+    {
+        return $this->belongsTo(BoksArsip::class, 'boks_id');
     }
 
     public function riwayatSirkulasi(): HasMany

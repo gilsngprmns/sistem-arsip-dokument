@@ -4,7 +4,7 @@ import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
-import { useForm } from '@inertiajs/vue3';
+import { useForm, router } from '@inertiajs/vue3';
 import { computed, watch } from 'vue';
 
 const props = defineProps({
@@ -50,7 +50,13 @@ const submit = () => {
 
     form.post(route(routeName, props.arsip.id), {
         preserveScroll: true,
-        onSuccess: () => emit('close'),
+        onSuccess: () => {
+            emit('close');
+            // Reload halaman parent untuk memuat flash notifikasi
+            if (window.location.pathname.startsWith('/arsip/')) {
+                router.reload({ only: ['arsip', 'flash'] });
+            }
+        },
     });
 };
 </script>

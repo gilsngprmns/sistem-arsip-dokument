@@ -50,7 +50,7 @@ class UpdateArsipRequest extends FormRequest
             'tujuan_instansi' => ['nullable', 'string', 'max:150'],
             'seksi_id' => ['required', 'exists:seksi,id'],
             'rak_id' => [
-                'nullable',
+                'required',
                 Rule::exists('rak_arsip', 'id')->where(function ($query) {
                     $query->where('is_active', true);
                     $seksiId = $this->input('seksi_id');
@@ -61,9 +61,27 @@ class UpdateArsipRequest extends FormRequest
                     }
                 }),
             ],
-            'nomor_box' => ['nullable', 'string', 'max:50'],
-            'nomor_map' => ['nullable', 'string', 'max:50'],
-            'nomor_slot' => ['nullable', 'string', 'max:50'],
+            'boks_id' => [
+                'required',
+                function ($attribute, $value, $fail) {
+                    $boks = \App\Models\BoksArsip::find($value);
+                    if (! $boks) {
+                        $fail('Boks tidak ditemukan.');
+                        return;
+                    }
+                    $rakId = $this->input('rak_id');
+                    if ($rakId && (int) $boks->rak_id !== (int) $rakId) {
+                        $fail('Boks harus sesuai dengan rak yang dipilih.');
+                        return;
+                    }
+                    // Untuk update, hitung dokumen lain di boks ini (kecuali dokumen yang sedang diupdate)
+                    $arsipId = (int) $this->route('arsip')->id;
+                    $count = $boks->dokumenArsip()->where('dokumen_arsip.id', '!=', $arsipId)->count();
+                    if ($boks->kapasitas !== null && $count + 1 > $boks->kapasitas) {
+                        $fail("Boks {$boks->kode_boks} sudah penuh ({$count}/{$boks->kapasitas}). Pilih boks lain.");
+                    }
+                },
+            ],
             'keterangan_posisi' => ['nullable', 'string'],
             'catatan' => ['nullable', 'string'],
             'status_arsip' => ['nullable', Rule::in(['tersedia', 'dipinjam', 'hilang'])],

@@ -2,8 +2,8 @@
 
 namespace Tests\Feature;
 
+use App\Models\BoksArsip;
 use App\Models\DokumenArsip;
-use App\Models\LokasiArsip;
 use App\Models\RakArsip;
 use App\Models\RiwayatSirkulasi;
 use App\Models\Seksi;
@@ -18,13 +18,7 @@ class TandaiHilangTest extends TestCase
     private function buatArsip(User $admin, string $status = 'tersedia'): DokumenArsip
     {
         $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
-        $lokasi = LokasiArsip::create([
-            'kode_lokasi' => 'LOC-TEST',
-            'nama_lokasi' => 'Ruang Test',
-            'is_active' => true,
-        ]);
         $rak = RakArsip::create([
-            'lokasi_id' => $lokasi->id,
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-TEST',
             'nama_rak' => 'Rak Test',
@@ -102,6 +96,8 @@ class TandaiHilangTest extends TestCase
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-HILANG', 'nama_rak' => 'Rak Hilang', 'is_active' => true]);
+        $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-HILANG', 'kapasitas' => 10, 'is_active' => true]);
 
         $response = $this->actingAs($admin)->post(route('arsip.store'), [
             'kode_arsip' => 'STORE-HILANG',
@@ -111,6 +107,8 @@ class TandaiHilangTest extends TestCase
             'sifat_surat' => 'biasa',
             'tanggal_surat' => now()->toDateString(),
             'seksi_id' => $seksi->id,
+            'rak_id' => $rak->id,
+            'boks_id' => $boks->id,
             'status_arsip' => 'hilang',
         ]);
 

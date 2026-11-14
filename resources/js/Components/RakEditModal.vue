@@ -21,10 +21,6 @@ const props = defineProps({
         type: Object,
         default: null,
     },
-    lokasiList: {
-        type: Array,
-        default: () => [],
-    },
     seksiList: {
         type: Array,
         default: () => [],
@@ -46,12 +42,10 @@ const truncateOption = (text, maxChars = 28) => {
 };
 
 const emptyForm = () => ({
-    lokasi_id: '',
     seksi_id: '',
     kode_rak: '',
     nama_rak: '',
     nomor_rak: '',
-    kapasitas: 100,
     deskripsi: '',
     is_active: true,
 });
@@ -66,12 +60,10 @@ const errors = computed(() => {
 const fillForm = () => {
     if (props.mode === 'edit' && props.initialData) {
         form.value = {
-            lokasi_id: props.initialData.lokasi_id ?? '',
             seksi_id: props.initialData.seksi_id ?? '',
             kode_rak: props.initialData.kode_rak ?? '',
             nama_rak: props.initialData.nama_rak ?? '',
             nomor_rak: props.initialData.nomor_rak ?? '',
-            kapasitas: props.initialData.kapasitas ?? null,
             deskripsi: props.initialData.deskripsi ?? '',
             is_active: Boolean(props.initialData.is_active ?? true),
         };
@@ -150,22 +142,6 @@ const submit = () => {
         <form class="space-y-4 px-6 py-5 max-h-[75vh] overflow-y-auto rounded-lg" @submit.prevent="submit">
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="min-w-0">
-                    <InputLabel for="lokasi_id" value="Lokasi *" />
-                    <select
-                        id="lokasi_id"
-                        v-model="form.lokasi_id"
-                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
-                        required
-                    >
-                        <option value="">Pilih lokasi</option>
-                        <option v-for="lokasi in lokasiList" :key="lokasi.id" :value="lokasi.id">
-                            {{ truncateOption(lokasi.nama_lokasi + ' (' + lokasi.kode_lokasi + ')') }}
-                        </option>
-                    </select>
-                    <InputError class="mt-1" :message="errors.lokasi_id" />
-                </div>
-
-                <div class="min-w-0">
                     <InputLabel for="seksi_id" value="Seksi Pemilik *" />
                     <select
                         id="seksi_id"
@@ -218,18 +194,6 @@ const submit = () => {
                         placeholder="mis. 1"
                     />
                     <InputError class="mt-1" :message="errors.nomor_rak" />
-                </div>
-
-                <div class="min-w-0">
-                    <InputLabel for="kapasitas" value="Kapasitas" />
-                    <input
-                        id="kapasitas"
-                        v-model="form.kapasitas"
-                        type="number"
-                        min="1"
-                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
-                    />
-                    <InputError class="mt-1" :message="errors.kapasitas" />
                 </div>
             </div>
 

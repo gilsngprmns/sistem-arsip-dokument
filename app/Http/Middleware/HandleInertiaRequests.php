@@ -40,6 +40,7 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),
                 'danger'  => fn () => $request->session()->get('danger'),
+                'welcome' => fn () => $request->session()->get('welcome'),
                 // Ringkasan hasil pemulihan (metrik) dikirim terpisah agar bisa
                 // dirender sebagai panel persisten, bukan flash yang auto-hide.
                 'backup_result' => fn () => $request->session()->get('backup_result'),

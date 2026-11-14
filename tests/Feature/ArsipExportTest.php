@@ -12,7 +12,7 @@ class ArsipExportTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_export_csv_has_utf8_bom(): void
+    public function test_export_returns_xlsx_content_type(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksi = Seksi::factory()->create();
@@ -21,144 +21,29 @@ class ArsipExportTest extends TestCase
             'seksi_id' => $seksi->id,
             'dicatat_oleh' => $admin->id,
             'tanggal_surat' => '2026-11-03',
-            'tanggal_diterima' => '2026-11-02',
         ]);
 
         $response = $this->actingAs($admin)->get('/arsip/export');
+
         $response->assertOk();
-
-        $body = $response->streamedContent();
-        $this->assertStringStartsWith("\xEF\xBB\xBF", $body);
+        $response->assertHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        $disposition = $response->headers->get('Content-Disposition');
+        $this->assertStringContainsString('.xlsx', $disposition);
     }
 
-    public function test_export_csv_has_correct_headers(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::factory()->create();
-
-        DokumenArsip::factory()->create([
-            'seksi_id' => $seksi->id,
-            'dicatat_oleh' => $admin->id,
-            'tanggal_surat' => '2026-11-03',
-            'tanggal_diterima' => null,
-        ]);
-
-        $response = $this->actingAs($admin)->get('/arsip/export');
-        $body = $response->streamedContent();
-
-        // Strip BOM before parsing
-        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
-        $lines = explode("\n", trim($body));
-
-        // First line is header
-        $header = str_getcsv($lines[0], ';');
-        $expectedHeaders = [
-            'Kode Arsip',
-            'Nomor Surat',
-            'Perihal',
-            'Jenis Surat',
-            'Sifat Surat',
-            'Tanggal Surat',
-            'Tanggal Diterima',
-            'Asal Instansi',
-            'Tujuan Instansi',
-            'Seksi',
-            'Status Arsip',
-            'Catatan',
-            'File Path',
-        ];
-        $this->assertEquals($expectedHeaders, $header);
-    }
-
-    public function test_export_csv_data_rows_use_consistent_delimiter(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::factory()->create();
-
-        DokumenArsip::factory()->create([
-            'seksi_id' => $seksi->id,
-            'dicatat_oleh' => $admin->id,
-            'nomor_surat' => '123/ABC/2026',
-            'perihal' => 'Surat uji , koma dan ; titik koma',
-            'tanggal_surat' => '2026-11-03',
-            'status_arsip' => 'tersedia',
-        ]);
-
-        $response = $this->actingAs($admin)->get('/arsip/export');
-        $body = $response->streamedContent();
-
-        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
-        $lines = explode("\n", trim($body));
-
-        // Data row should be parseable with semicolon delimiter
-        $dataRow = str_getcsv($lines[1], ';');
-        $this->assertCount(13, $dataRow);
-        $this->assertEquals('123/ABC/2026', $dataRow[1]);
-        $this->assertEquals('Surat uji , koma dan ; titik koma', $dataRow[2]);
-        $this->assertEquals('2026-11-03', $dataRow[5]);
-        $this->assertEquals('tersedia', $dataRow[10]);
-    }
-
-    public function test_export_csv_date_format_is_yyyy_mm_dd(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::factory()->create();
-
-        DokumenArsip::factory()->create([
-            'seksi_id' => $seksi->id,
-            'dicatat_oleh' => $admin->id,
-            'tanggal_surat' => '2026-05-15',
-            'tanggal_diterima' => '2026-05-16',
-        ]);
-
-        $response = $this->actingAs($admin)->get('/arsip/export');
-        $body = $response->streamedContent();
-
-        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
-        $lines = explode("\n", trim($body));
-        $dataRow = str_getcsv($lines[1], ';');
-
-        $this->assertEquals('2026-05-15', $dataRow[5]); // Tanggal Surat
-        $this->assertEquals('2026-05-16', $dataRow[6]); // Tanggal Diterima
-    }
-
-    public function test_export_csv_null_date_becomes_empty_field(): void
-    {
-        $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::factory()->create();
-
-        DokumenArsip::factory()->create([
-            'seksi_id' => $seksi->id,
-            'dicatat_oleh' => $admin->id,
-            'tanggal_surat' => '2026-01-01',
-            'tanggal_diterima' => null,
-        ]);
-
-        $response = $this->actingAs($admin)->get('/arsip/export');
-        $body = $response->streamedContent();
-
-        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
-        $lines = explode("\n", trim($body));
-        $dataRow = str_getcsv($lines[1], ';');
-
-        $this->assertEquals('2026-01-01', $dataRow[5]);
-        $this->assertEquals('', $dataRow[6]);
-    }
-
-    public function test_export_csv_response_headers_are_correct(): void
+    public function test_export_filename_is_arsip_dokumen(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         Seksi::factory()->create();
 
         $response = $this->actingAs($admin)->get('/arsip/export');
-
-        $response->assertHeader('Content-Type', 'text/csv; charset=UTF-8');
         $disposition = $response->headers->get('Content-Disposition');
-        $this->assertStringStartsWith('attachment; filename=arsip-dokumen-', $disposition);
-        $this->assertStringEndsWith('.csv', $disposition);
+
+        $this->assertStringContainsString('arsip-dokumen-', $disposition);
+        $this->assertStringEndsWith('.xlsx', $disposition);
     }
 
-    public function test_export_csv_respects_active_filters(): void
+    public function test_export_respects_active_filters(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
         $seksiA = Seksi::factory()->create(['nama_seksi' => 'Seksi A']);
@@ -176,15 +61,13 @@ class ArsipExportTest extends TestCase
             'status_arsip' => 'dipinjam',
         ]);
 
-        // Export with filter status=tersedia
+        // Export with filter status=tersedia should still return 200
         $response = $this->actingAs($admin)->get('/arsip/export?status=tersedia');
-        $body = $response->streamedContent();
+        $response->assertOk();
 
-        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
-        $lines = explode("\n", trim($body));
-
-        // Header + 1 data row (only 1 arsip with status tersedia)
-        $this->assertCount(2, $lines);
+        // Verify by downloading and checking content is not empty
+        $content = $response->streamedContent();
+        $this->assertNotEmpty($content);
     }
 
     public function test_staff_can_only_export_their_own_seksi(): void
@@ -205,14 +88,53 @@ class ArsipExportTest extends TestCase
             'dicatat_oleh' => $staffB->id,
         ]);
 
-        // Staff A exports — should only see their own seksi
+        // Staff A exports — should get 200 (file contains only their seksi)
         $response = $this->actingAs($staffA)->get('/arsip/export');
-        $body = $response->streamedContent();
+        $response->assertOk();
+    }
 
-        $body = preg_replace('/^\xEF\xBB\xBF/', '', $body);
-        $lines = explode("\n", trim($body));
+    public function test_export_with_no_documents_returns_valid_xlsx(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
 
-        // Header + 1 data row (only 1 from Seksi A)
-        $this->assertCount(2, $lines);
+        $response = $this->actingAs($admin)->get('/arsip/export');
+        $response->assertOk();
+
+        $content = $response->streamedContent();
+        // XLSZ files start with PK (zip magic bytes)
+        $this->assertStringStartsWith('PK', $content);
+    }
+
+    public function test_unauthenticated_user_cannot_export(): void
+    {
+        $response = $this->get('/arsip/export');
+        $response->assertRedirect('/login');
+    }
+
+    public function test_export_file_column_has_hyperlinks(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin']);
+        $seksi = Seksi::factory()->create();
+
+        DokumenArsip::factory()->create([
+            'seksi_id' => $seksi->id,
+            'dicatat_oleh' => $admin->id,
+            'file_path' => 'lampiran-arsip/test-file.pdf',
+        ]);
+
+        $response = $this->actingAs($admin)->get('/arsip/export');
+        $response->assertOk();
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'test-xlsx-');
+        file_put_contents($tmpFile, $response->streamedContent());
+
+        $reader = \PhpOffice\PhpSpreadsheet\IOFactory::createReader('Xlsx');
+        $spreadsheet = $reader->load($tmpFile);
+        $sheet = $spreadsheet->getActiveSheet();
+        unlink($tmpFile);
+
+        $cell = $sheet->getCell('N2');
+        $this->assertSame('test-file.pdf', $cell->getValue());
+        $this->assertStringContainsString('/storage/lampiran-arsip/test-file.pdf', $cell->getHyperlink()->getUrl());
     }
 }

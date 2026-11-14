@@ -7,15 +7,21 @@ import { ref } from 'vue';
 // Tab default = webcam, mengikuti perilaku lama (versi modal) saat pertama dibuka.
 const tab = ref('webcam');
 const foundArsip = ref(null);
+const foundBoks = ref(null);
 
 const switchTab = (value) => {
     tab.value = value;
     foundArsip.value = null; // hindari tombol "Buka Detail" stale setelah error/ganti tab
 };
 
-const onFound = (arsip) => {
-    // Respons /api/arsip/scan = JSON DokumenArsip (with seksi), sudah membawa `id`.
-    foundArsip.value = arsip;
+const onFound = (data) => {
+    if (data?.kode_boks) {
+        foundBoks.value = data;
+        foundArsip.value = null;
+    } else {
+        foundArsip.value = data;
+        foundBoks.value = null;
+    }
 };
 </script>
 
@@ -67,6 +73,16 @@ const onFound = (arsip) => {
                 class="flex items-center justify-center gap-2 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700"
             >
                 Buka Detail Arsip
+                <AppIcon name="chevron-right" :size="16" :stroke-width="2" class="h-4 w-4" decorative />
+            </Link>
+
+            <Link
+                v-if="foundBoks?.kode_boks"
+                :href="route('scan.boks', foundBoks.kode_boks)"
+                class="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+                Lihat Semua Dokumen di Boks
+                <span class="ml-1 text-xs opacity-80">({{ foundBoks.dokumen_arsip_count ?? 0 }})</span>
                 <AppIcon name="chevron-right" :size="16" :stroke-width="2" class="h-4 w-4" decorative />
             </Link>
         </div>

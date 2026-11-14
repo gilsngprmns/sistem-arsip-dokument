@@ -36,7 +36,8 @@ class UserManagementController extends Controller
                 fn ($query) => $query->where('seksi_id', (int) $filters['seksi_id']),
             )
             ->when($filters['seksi_id'] === 'none', fn ($query) => $query->whereNull('seksi_id'))
-            ->latest('id')
+            ->orderByRaw("CASE role WHEN 'admin' THEN 1 WHEN 'staf' THEN 2 ELSE 3 END ASC")
+            ->oldest('id')
             ->paginate(15)
             ->withQueryString();
 
@@ -111,7 +112,22 @@ class UserManagementController extends Controller
             ]);
         }
 
+        $wasInactive = ! $user->is_active;
+        $willActivate = ($validated['is_active'] ?? false) === true;
+
         $user->update($validated);
+
+        // Recovery dari lockout brute-force: wajib reset counter saat
+        // admin mengaktifkan kembali akun yang sedang nonaktif.
+        if ($wasInactive && $willActivate) {
+            $user->login_attempts = 0;
+            $user->save();
+
+            return redirect()->route('users.index')
+                ->with('success', 'Pengguna berhasil diperbarui.')
+                ->with('recovery', true)
+                ->with('recovery_email', $user->email);
+        }
 
         return redirect()->route('users.index')->with('success', 'Pengguna berhasil diperbarui.');
     }
@@ -162,6 +178,27 @@ class UserManagementController extends Controller
         $user->forceDelete();
 
         return redirect()->route('users.index')->with('danger', 'Pengguna berhasil dihapus permanen dari database.');
+    }
+
+    public function destroyBulk(Request $request): RedirectResponse
+    {
+        $ids = $request->validate([
+            'ids' => 'required|array|min:1',
+            'ids.*' => 'required|integer|exists:users,id',
+        ])['ids'];
+
+        $userCount = count($ids);
+        $deleted = User::whereIn('id', $ids)->delete();
+
+        session()->flash('activity_log_metadata', [
+            'jenis' => 'hapus_pengguna',
+            'status' => 'sukses',
+            'jumlah_dihapus' => $deleted,
+            'ids' => $ids,
+        ]);
+
+        return redirect()->route('users.index')
+            ->with('danger', "$deleted pengguna berhasil dihapus permanen.");
     }
 
     protected function isLastActiveAdmin(User $user): bool

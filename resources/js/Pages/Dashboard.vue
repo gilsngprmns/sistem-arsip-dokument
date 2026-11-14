@@ -14,7 +14,7 @@ const props = defineProps({
             dokumen_dipinjam: 0,
             dokumen_hilang: 0,
             total_user: 0,
-            total_lokasi: 0,
+            total_boks: 0,
             total_rak: 0,
             per_seksi: [],
             scope: '',
@@ -135,25 +135,25 @@ const kpiCards = computed(() => [
         label: 'Total Dokumen',
         value: props.stats.total_dokumen,
         tone: 'border-brand-blue/20 bg-brand-blue/5 text-brand-blue',
-        href: route('arsip.index'),
+        iconName: 'arsip',
     },
     {
         label: 'Tersedia',
         value: props.stats.dokumen_tersedia,
         tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        href: route('arsip.index', { status: 'tersedia' }),
+        iconName: 'tersedia',
     },
     {
         label: 'Dipinjam',
         value: props.stats.dokumen_dipinjam,
         tone: 'border-amber-200 bg-amber-50 text-amber-700',
-        href: route('arsip.index', { status: 'dipinjam', sort: 'batas' }),
+        iconName: 'dipinjam',
     },
     {
         label: 'Hilang',
         value: props.stats.dokumen_hilang,
         tone: 'border-rose-200 bg-rose-50 text-rose-700',
-        href: route('arsip.index', { status: 'hilang' }),
+        iconName: 'hilang',
     },
 ]);
 
@@ -174,7 +174,6 @@ const alerts = computed(() => {
             hint: 'Dokumen sudah melewati batas pengembalian',
             tone: 'border-rose-200 bg-rose-50 text-rose-800',
             valueTone: 'text-rose-700',
-            href: route('arsip.index', { status: 'dipinjam', terlambat: 1, sort: 'batas' }),
         });
     }
 
@@ -186,7 +185,6 @@ const alerts = computed(() => {
             hint: 'Dokumen belum ditempatkan di rak',
             tone: 'border-amber-200 bg-amber-50 text-amber-800',
             valueTone: 'text-amber-700',
-            href: route('arsip.index', { tanpa_lokasi: 1 }),
         });
     }
 
@@ -198,7 +196,6 @@ const alerts = computed(() => {
             hint: 'Nomor, tanggal, perihal, atau seksi belum terisi',
             tone: 'border-amber-200 bg-amber-50 text-amber-800',
             valueTone: 'text-amber-700',
-            href: route('arsip.index', { metadata_kosong: 1 }),
         });
     }
 
@@ -210,7 +207,6 @@ const alerts = computed(() => {
             hint: 'Berkas fisik belum dipindai atau diunggah',
             tone: 'border-slate-200 bg-slate-50 text-slate-700',
             valueTone: 'text-slate-700',
-            href: route('arsip.index', { tanpa_file: 1 }),
         });
     }
 
@@ -222,25 +218,24 @@ const alerts = computed(() => {
             hint: 'QR code belum dibuat atau terhubung',
             tone: 'border-slate-200 bg-slate-50 text-slate-700',
             valueTone: 'text-slate-700',
-            href: route('arsip.index', { tanpa_qr: 1 }),
         });
     }
 
     return items;
 });
 
-/* ============ Capacity rack panel (right col) ============ */
-const rackItems = computed(() => {
-    if (!isAdmin.value || !props.adminOverview?.rak_perhatian) return [];
-    return props.adminOverview.rak_perhatian.slice(0, 5);
+/* ============ Capacity boks panel (right col) ============ */
+const boksItems = computed(() => {
+    if (!isAdmin.value || !props.adminOverview?.boks_perhatian) return [];
+    return props.adminOverview.boks_perhatian.slice(0, 5);
 });
 
-const rackBarTone = (pct) => {
+const boksBarTone = (pct) => {
     if (pct >= 100) return 'bg-rose-500';
     return 'bg-amber-500';
 };
 
-const rackStatusLabel = (pct) => {
+const boksStatusLabel = (pct) => {
     if (pct >= 100) return 'Penuh';
     return 'Hampir penuh';
 };
@@ -287,7 +282,7 @@ const adminShortcuts = computed(() => [
     {
         key: 'report-sections',
         label: 'Export Rekap Seksi',
-        description: 'CSV ringkasan arsip per seksi',
+        description: 'Excel ringkasan arsip per seksi',
         href: route('reports.sections'),
         external: true,
         tone: 'border-slate-100 bg-white text-slate-800',
@@ -295,7 +290,7 @@ const adminShortcuts = computed(() => [
     {
         key: 'report-users',
         label: 'Export User',
-        description: 'CSV daftar pengguna sistem',
+        description: 'Excel daftar pengguna sistem',
         href: route('reports.users'),
         external: true,
         tone: 'border-slate-100 bg-white text-slate-800',
@@ -303,7 +298,7 @@ const adminShortcuts = computed(() => [
     {
         key: 'report-racks',
         label: 'Export Rak',
-        description: 'CSV kapasitas & isi rak',
+        description: 'Excel kapasitas & isi rak',
         href: route('reports.racks'),
         external: true,
         tone: 'border-slate-100 bg-white text-slate-800',
@@ -311,7 +306,7 @@ const adminShortcuts = computed(() => [
     {
         key: 'report-activity',
         label: 'Export Aktivitas',
-        description: 'CSV log aktivitas sistem',
+        description: 'Excel log aktivitas sistem',
         href: route('reports.activity'),
         external: true,
         tone: 'border-slate-100 bg-white text-slate-800',
@@ -451,11 +446,11 @@ const closeSirkulasi = () => {
                         <div v-for="i in 3" :key="'notif-' + i" class="h-3 rounded bg-slate-100" />
                     </div>
                 </div>
-                <!-- Kapasitas Rak -->
+                <!-- Kapasitas Boks -->
                 <div class="rounded-2xl bg-slate-200 p-4">
                     <div class="h-4 w-32 rounded bg-slate-100" />
                     <div class="mt-4 space-y-3">
-                        <div v-for="i in 3" :key="'rak-' + i" class="h-2 rounded bg-slate-100" />
+                        <div v-for="i in 3" :key="'boks-' + i" class="h-2 rounded bg-slate-100" />
                     </div>
                 </div>
                 <!-- Aktivitas Terbaru -->
@@ -489,20 +484,27 @@ const closeSirkulasi = () => {
             <div class="space-y-5 lg:col-span-8">
                 <!-- Baris 1: KPI 4 kolom -->
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Link
+                    <div
                         v-for="(card, index) in kpiCards"
                         :key="card.label"
                         v-reveal
                         :style="{ transitionDelay: `${index * 100}ms` }"
-                        :href="card.href"
-                        class="rounded-2xl border bg-white p-3 shadow-sm transition hover:ring-2 hover:ring-brand-blue/20 sm:p-4 md:p-5"
+                        class="rounded-2xl border bg-white p-3 shadow-sm sm:p-4 md:p-5"
                         :class="card.tone"
                     >
-                        <p class="text-xs font-semibold uppercase tracking-wider opacity-80">
-                            {{ card.label }}
-                        </p>
+                        <div class="flex items-center gap-2">
+                            <AppIcon
+                                :name="card.iconName"
+                                :size="18"
+                                class="h-5 w-5 shrink-0 opacity-70"
+                                decorative
+                            />
+                            <p class="text-xs font-semibold uppercase tracking-wider opacity-80">
+                                {{ card.label }}
+                            </p>
+                        </div>
                         <p class="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">{{ card.value }}</p>
-                    </Link>
+                    </div>
                 </div>
 
                 <!-- Baris 2: Visualisasi (tren + volume per seksi) -->
@@ -786,11 +788,10 @@ const closeSirkulasi = () => {
                         </span>
                     </div>
                     <div v-if="alerts.length" class="mt-3 space-y-2">
-                        <Link
+                        <div
                             v-for="alert in alerts"
                             :key="alert.key"
-                            :href="alert.href"
-                            class="flex flex-col gap-1.5 rounded-xl border p-3 transition hover:shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                            class="flex flex-col gap-1.5 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
                             :class="alert.tone"
                         >
                             <div class="min-w-0 flex-1">
@@ -800,7 +801,7 @@ const closeSirkulasi = () => {
                             <span class="shrink-0 text-2xl font-bold sm:min-w-[3ch] sm:text-right" :class="alert.valueTone">
                                 {{ alert.value }}
                             </span>
-                        </Link>
+                        </div>
                     </div>
                     <div v-else class="mt-3 rounded-xl bg-emerald-50 p-4 text-center">
                         <p class="text-sm font-semibold text-emerald-800">Semua terkendali.</p>
@@ -810,44 +811,45 @@ const closeSirkulasi = () => {
                     </div>
                 </div>
 
-                <!-- Kapasitas rak (progress bar) -->
+                <!-- Kapasitas boks (progress bar) -->
                 <div v-reveal :style="{ transitionDelay: '100ms' }" class="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                     <div class="flex items-center justify-between gap-2">
                         <div class="min-w-0">
-                            <h2 class="text-sm font-bold text-brand-navy">Kapasitas Rak</h2>
-                            <p class="mt-1 text-xs text-slate-500">Rak terisi di atas 80%</p>
+                            <h2 class="text-sm font-bold text-brand-navy">Kapasitas Boks</h2>
+                            <p class="mt-1 text-xs text-slate-500">Boks terisi di atas 80%</p>
                         </div>
                         <Link
                             v-if="isAdmin"
-                            :href="route('rak.index')"
+                            :href="route('boks.index')"
                             class="shrink-0 text-xs font-semibold text-brand-blue hover:underline"
                         >
                             Kelola
                         </Link>
                     </div>
-                    <div v-if="rackItems.length" class="mt-3 space-y-3">
-                        <div v-for="rack in rackItems" :key="rack.id">
+                    <div v-if="boksItems.length" class="mt-3 space-y-3">
+                        <div v-for="boks in boksItems" :key="boks.id">
                             <div class="flex items-center justify-between gap-2 text-xs">
                                 <span class="min-w-0 flex-1 truncate font-semibold text-slate-700">
-                                    {{ rack.kode_rak }} · {{ rack.nama_rak }}
+                                    {{ boks.kode_boks }}
+                                    <template v-if="boks.rak">· {{ boks.rak.kode_rak }}</template>
                                 </span>
                                 <span
                                     class="shrink-0 font-bold"
-                                    :class="rack.pct >= 100 ? 'text-rose-600' : 'text-amber-600'"
+                                    :class="boks.pct >= 100 ? 'text-rose-600' : 'text-amber-600'"
                                 >
-                                    {{ rack.pct }}%
+                                    {{ boks.pct }}%
                                 </span>
                             </div>
                             <div class="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
                                 <div
                                     class="h-full rounded-full transition-all duration-500"
-                                    :class="rackBarTone(rack.pct)"
-                                    :style="{ width: Math.min(rack.pct, 100) + '%' }"
+                                    :class="boksBarTone(boks.pct)"
+                                    :style="{ width: Math.min(boks.pct, 100) + '%' }"
                                 />
                             </div>
                             <div class="mt-1 flex items-center justify-between text-[10px] text-slate-500">
-                                <span>{{ rack.dokumen_arsip_count }} / {{ rack.kapasitas }} dokumen</span>
-                                <span>{{ rackStatusLabel(rack.pct) }}</span>
+                                <span>{{ boks.dokumen_arsip_count }} / {{ boks.kapasitas }} dokumen</span>
+                                <span>{{ boksStatusLabel(boks.pct) }}</span>
                             </div>
                         </div>
                     </div>
@@ -855,7 +857,7 @@ const closeSirkulasi = () => {
                         v-else
                         class="mt-3 rounded-xl bg-slate-50 p-4 text-center text-sm text-slate-500"
                     >
-                        Tidak ada rak yang terisi di atas 80%.
+                        Tidak ada boks yang terisi di atas 80%.
                     </div>
                 </div>
 
@@ -941,7 +943,7 @@ const closeSirkulasi = () => {
                                 User: {{ props.stats.total_user }}
                             </span>
                             <span class="rounded-full bg-sky-50 px-2.5 py-1 font-bold text-sky-700">
-                                Lokasi: {{ props.stats.total_lokasi }}
+                                Boks: {{ props.stats.total_boks }}
                             </span>
                             <span class="rounded-full bg-rose-50 px-2.5 py-1 font-bold text-rose-700">
                                 Rak: {{ props.stats.total_rak }}

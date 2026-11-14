@@ -1,6 +1,6 @@
 <script setup>
+import AppIcon from '@/Components/AppIcon.vue';
 import Sidebar from '@/Components/Sidebar.vue';
-import StafOnlineToast from '@/Components/StafOnlineToast.vue';
 import { useStafOnline } from '@/composables/useStafOnline';
 import { useAutoLogout } from '@/composables/useAutoLogout';
 import { institution } from '@/config/institution';
@@ -21,10 +21,7 @@ const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 useAutoLogout();
 
 /* ============ Notifikasi staf online (admin-only) ============ */
-const stafToast = ref(null);
-const { count: stafOnlineCount } = useStafOnline((stafBaru) => {
-    stafToast.value?.addToast(stafBaru);
-});
+const { count: stafOnlineCount } = useStafOnline();
 
 /* ============ Skeleton loading ====== */
 const SKELETON_MS = 1000;
@@ -52,7 +49,33 @@ watch(
 
 onBeforeUnmount(() => {
     if (skeletonTimer) clearTimeout(skeletonTimer);
+    if (welcomeTimer) clearTimeout(welcomeTimer);
 });
+
+/* ============ Banner sambutan inline di sticky topbar ============ */
+// Snapshot flash saat setup — Inertia props tidak berubah setelah mount.
+// Banner muncul setelah skeleton selesai, 8 detik, auto-hide.
+const showWelcome = ref(false);
+let welcomeTimer = null;
+const hasWelcomeFlash = page.props.flash?.welcome === true;
+
+function armWelcome() {
+    if (!hasWelcomeFlash || welcomeTimer) return;
+    showWelcome.value = true;
+    welcomeTimer = setTimeout(() => {
+        showWelcome.value = false;
+        welcomeTimer = null;
+    }, 8000);
+}
+
+// Mulai banner langsung saat setup — muncul setelah login, tanpa menunggu skeleton.
+armWelcome();
+
+function dismissWelcome() {
+    if (welcomeTimer) clearTimeout(welcomeTimer);
+    welcomeTimer = null;
+    showWelcome.value = false;
+}
 
 const SIDEBAR_STORAGE_KEY = 'siparsip.sidebar.collapsed';
 
@@ -168,23 +191,46 @@ onUnmounted(() => {
                             {{ page.props.auth?.user?.name }}
                         </Link>
                     </div>
-                    <!-- Indikator staf online — hanya admin, di kanan header -->
+                    <!-- Live presence badge — selalu render, admin-only, di kanan header -->
                     <span
-                        v-if="isAdmin && stafOnlineCount > 0"
-                        class="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 sm:order-last sm:ml-auto"
+                        v-if="isAdmin"
+                        class="inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold tracking-wide backdrop-blur-sm sm:order-last sm:ml-auto"
+                        :class="stafOnlineCount > 0 ? 'border border-emerald-200/60 bg-emerald-50/50 text-emerald-700' : 'border border-slate-200/60 bg-white/40 text-slate-500'"
                         role="status"
                         aria-live="polite"
                     >
-                        <span class="relative flex h-2 w-2">
-                            <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
-                            <span class="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                        <span class="relative flex h-1.5 w-1.5">
+                            <template v-if="stafOnlineCount > 0">
+                                <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75 motion-reduce:hidden" />
+                                <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            </template>
+                            <span v-else class="relative inline-flex h-1.5 w-1.5 rounded-full bg-slate-400" />
                         </span>
-                        {{ stafOnlineCount }} staf online
+                        {{ stafOnlineCount > 0 ? `${stafOnlineCount} Staf Online` : 'Tidak Ada Staf' }}
                     </span>
                     <div class="hidden min-w-0 flex-1 sm:block" aria-hidden="true" />
-                    <!-- Ruang bekas search bar: lebar & tinggi (34px = input + padding + border) disamakan dengan input sebelumnya agar header tidak mengecil -->
-                    <div class="min-w-0 w-full flex-1 sm:max-w-xl" aria-hidden="true">
-                        <div class="h-[34px] w-full" />
+                    <!-- Ruang bekas search bar: lebar & tinggi (34px) disamakan dengan input sebelumnya agar header tidak mengecil -->
+                    <div class="relative min-w-0 w-full flex-1 sm:max-w-xl">
+                        <div class="h-[34px] w-full" aria-hidden="true" />
+                        <Transition name="welcome-inline">
+                            <div
+                                v-if="showWelcome"
+                                class="absolute inset-0 flex items-center justify-center gap-2 px-3"
+                                role="status"
+                            >
+                                <p class="text-sm font-semibold text-brand-navy">
+                                    Selamat datang, {{ page.props.auth?.user?.name ?? 'Rekan' }}!
+                                </p>
+                                <button
+                                    type="button"
+                                    class="shrink-0 rounded p-0.5 text-slate-400 transition hover:text-slate-600"
+                                    aria-label="Tutup"
+                                    @click="dismissWelcome"
+                                >
+                                    <AppIcon name="close" :size="14" :stroke-width="1.8" class="h-3.5 w-3.5" decorative />
+                                </button>
+                            </div>
+                        </Transition>
                     </div>
                     <div class="hidden min-w-0 flex-1 sm:block" aria-hidden="true" />
                 </div>
@@ -221,8 +267,22 @@ onUnmounted(() => {
                 </template>
             </main>
         </div>
-
-        <!-- Toast staf online (admin-only), dipasang di semua halaman AppLayout -->
-        <StafOnlineToast v-if="isAdmin" ref="stafToast" />
     </div>
 </template>
+
+<style scoped>
+.welcome-inline-enter-active,
+.welcome-inline-leave-active {
+    transition: opacity 0.25s ease-out;
+}
+.welcome-inline-enter-from,
+.welcome-inline-leave-to {
+    opacity: 0;
+}
+@media (prefers-reduced-motion: reduce) {
+    .welcome-inline-enter-active,
+    .welcome-inline-leave-active {
+        transition: none;
+    }
+}
+</style>

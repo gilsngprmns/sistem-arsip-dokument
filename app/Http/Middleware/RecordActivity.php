@@ -8,7 +8,7 @@ use App\Models\BerandaSlide;
 use App\Models\DokumenArsip;
 use App\Models\Faq;
 use App\Models\Manfaat;
-use App\Models\LokasiArsip;
+use App\Models\BoksArsip;
 use App\Models\RakArsip;
 use App\Models\Seksi;
 use App\Models\User;
@@ -172,7 +172,7 @@ class RecordActivity
                 $model instanceof DokumenArsip => ['dokumen', $model->id, $model->nomor_surat ?: ('Dokumen #'.$model->id)],
                 $model instanceof User => ['user', $model->id, $model->name],
                 $model instanceof RakArsip => ['rak', $model->id, $model->kode_rak],
-                $model instanceof LokasiArsip => ['lokasi', $model->id, $model->nama_lokasi],
+                $model instanceof BoksArsip => ['boks', $model->id, $model->kode_boks],
                 $model instanceof Manfaat => ['halaman_publik', $model->id, $model->judul],
                 $model instanceof AlurKerja => ['halaman_publik', $model->id, 'Langkah '.$model->nomor.' — '.$model->judul],
                 $model instanceof BerandaSlide => ['halaman_publik', $model->id, 'Slide foto #'.$model->id],
@@ -189,7 +189,7 @@ class RecordActivity
             str_starts_with($routeName, 'arsip.') => $this->targetFromArsipInput($input),
             str_starts_with($routeName, 'users.') => $this->targetFromUserInput($input),
             str_starts_with($routeName, 'rak.') => $this->targetFromRakInput($input),
-            str_starts_with($routeName, 'lokasi.') => $this->targetFromLokasiInput($input),
+            str_starts_with($routeName, 'boks.') => $this->targetFromBoksInput($input),
             str_starts_with($routeName, 'halaman-publik.')
                 || str_starts_with($routeName, 'beranda.')
                 || str_starts_with($routeName, 'manfaat.')
@@ -237,16 +237,16 @@ class RecordActivity
         return ['rak', $id, $input['kode_rak'] ?? null];
     }
 
-    private function targetFromLokasiInput(array $input): array
+    private function targetFromBoksInput(array $input): array
     {
         $id = $input['id'] ?? null;
         if ($id) {
-            $lokasi = LokasiArsip::find($id);
-            if ($lokasi) {
-                return ['lokasi', $lokasi->id, $lokasi->nama_lokasi];
+            $boks = BoksArsip::find($id);
+            if ($boks) {
+                return ['boks', $boks->id, $boks->kode_boks];
             }
         }
-        return ['lokasi', $id, $input['nama_lokasi'] ?? null];
+        return ['boks', $id, $input['kode_boks'] ?? null];
     }
 
     private function targetFromPublicPageInput(array $input): array
@@ -313,9 +313,9 @@ class RecordActivity
             'rak.index',
             'rak.store',
             'rak.update',
-            'lokasi.redirect',
-            'lokasi.store',
-            'lokasi.update',
+            'boks.index',
+            'boks.store',
+            'boks.update',
             'backup.index',
             'backup.export',
             'backup.files',
@@ -447,11 +447,11 @@ class RecordActivity
             case 'arsip.edit':
                 return 'Membuka form edit arsip.';
             case 'arsip.export':
-                return 'Mengekspor daftar arsip ke CSV.';
+                return 'Mengekspor daftar arsip ke Excel.';
             case 'rak.index':
                 return 'Membuka daftar rak arsip.';
-            case 'lokasi.redirect':
-                return 'Membuka daftar lokasi arsip.';
+            case 'boks.index':
+                return 'Membuka daftar boks arsip.';
             case 'backup.index':
                 return 'Membuka halaman backup.';
             case 'users.index':
@@ -497,12 +497,18 @@ class RecordActivity
                     ? "Menghapus rak arsip dari Seksi $nama."
                     : 'Menghapus rak arsip.';
 
-            case 'lokasi.store':
-                return 'Menambahkan lokasi penyimpanan.';
-            case 'lokasi.update':
-                return 'Memperbarui lokasi penyimpanan.';
-            case 'lokasi.destroy':
-                return 'Menghapus lokasi penyimpanan.';
+            case 'boks.store':
+                return 'Menambahkan boks arsip.';
+            case 'boks.update':
+                return 'Memperbarui boks arsip.';
+            case 'boks.destroy':
+                return 'Menghapus boks arsip.';
+            case 'boks.destroy-bulk':
+                return 'Menghapus massal boks arsip.';
+            case 'rak.destroy-bulk':
+                return 'Menghapus massal rak arsip.';
+            case 'users.destroy-bulk':
+                return 'Menghapus massal pengguna.';
             case 'beranda.slides.store':
                 return 'Menambahkan foto carousel beranda.';
             case 'beranda.slides.destroy':

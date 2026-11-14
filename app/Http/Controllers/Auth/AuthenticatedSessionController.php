@@ -51,6 +51,8 @@ class AuthenticatedSessionController extends Controller
             'target_label' => $user->name,
         ]);
 
+        $request->session()->flash('welcome', true);
+
         return redirect()->intended(route('dashboard', absolute: false));
     }
 

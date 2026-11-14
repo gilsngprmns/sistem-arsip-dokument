@@ -51,7 +51,7 @@ class PasswordResetTest extends TestCase
         $this->assertEquals(64, strlen($token->token)); // SHA-256 produces 64 char hex
     }
 
-    public function test_otp_cannot_be_sent_to_nonexistent_email(): void
+    public function test_otp_send_rejects_unregistered_email_with_error(): void
     {
         Mail::fake();
 
@@ -59,11 +59,12 @@ class PasswordResetTest extends TestCase
             'email' => 'nonexistent@example.com',
         ]);
 
-        // Harus tetap return sukses untuk mencegah email enumeration
-        $response->assertOk();
-        $response->assertJson(['status' => 'otp-sent']);
+        // Aturan 2026-11-07: email tak terdaftar ditolak eksplisit (banner merah di UI),
+        // bukan lagi respons sukses untuk menutupi (keputusan owner).
+        $response->assertStatus(422);
+        $response->assertJson(['error' => 'not-registered']);
 
-        // Tapi tidak ada email yang dikirim
+        // Tidak ada email yang dikirim
         Mail::assertNotSent(OtpResetPasswordMail::class);
     }
 
@@ -104,7 +105,7 @@ class PasswordResetTest extends TestCase
         ]);
 
         $response->assertStatus(422);
-        $response->assertJson(['error' => 'otp', 'message' => 'Kode OTP salah. Silakan periksa kembali.']);
+        $response->assertJson(['error' => 'otp', 'message' => 'Kode OTP salah. Silahkan periksa kembali.']);
     }
 
     public function test_password_can_be_reset_with_valid_otp(): void
@@ -150,15 +151,15 @@ class PasswordResetTest extends TestCase
         $response->assertJsonValidationErrors('otp');
     }
 
-    public function test_otp_expires_after_60_minutes(): void
+    public function test_otp_expires_after_3_minutes(): void
     {
         $user = User::factory()->create(['email' => 'test@example.com']);
 
-        // Simpan token dengan created_at 61 menit yang lalu
+        // Simpan token dengan created_at 4 menit yang lalu (melebihi batas 3 menit)
         DB::table('password_reset_tokens')->insert([
             'email' => $user->email,
             'token' => hash('sha256', '123456'),
-            'created_at' => now()->subMinutes(61),
+            'created_at' => now()->subMinutes(4),
         ]);
 
         $response = $this->postJson(route('password.otp.verify'), [
@@ -166,8 +167,126 @@ class PasswordResetTest extends TestCase
             'otp' => '123456',
         ]);
 
-        // Setelah 61 menit, token dianggap kadaluarsa
+        // Setelah melewati 3 menit, token dianggap kadaluarsa
         $response->assertStatus(422);
-        $response->assertJson(['error' => 'otp', 'message' => 'Kode OTP telah kadaluarsa. Silakan minta kode baru.']);
+        $response->assertJson(['error' => 'otp', 'message' => 'Kode OTP telah kadaluarsa. Silahkan minta kode baru.']);
+    }
+
+    public function test_otp_still_valid_within_3_minutes(): void
+    {
+        $user = User::factory()->create(['email' => 'test@example.com']);
+
+        // Token dibuat 2 menit yang lalu, masih di dalam batas 3 menit
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => hash('sha256', '123456'),
+            'created_at' => now()->subMinutes(2),
+        ]);
+
+        $response = $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp' => '123456',
+        ]);
+
+        $response->assertOk();
+        $response->assertJson(['status' => 'otp-verified']);
+    }
+
+    public function test_verify_otp_blocked_after_3_failures(): void
+    {
+        $user = User::factory()->create(['email' => 'test@example.com']);
+
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => hash('sha256', '123456'),
+            'created_at' => now(),
+        ]);
+
+        $key = 'otp-verify:'.mb_strtolower($user->email);
+        RateLimiter::clear($key);
+
+        // 3x salah → 422 setiap kali
+        for ($i = 0; $i < 3; $i++) {
+            $resp = $this->postJson(route('password.otp.verify'), [
+                'email' => $user->email,
+                'otp' => '000000',
+            ]);
+            $resp->assertStatus(422);
+        }
+
+        // Request ke-4 → 429 rate-limited
+        $resp = $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp' => '123456',
+        ]);
+        $resp->assertStatus(429);
+        $resp->assertJson(['error' => 'rate-limited']);
+        $resp->assertJsonStructure(['retryAfter']);
+
+        RateLimiter::clear($key);
+    }
+
+    public function test_resend_blocked_after_5_requests(): void
+    {
+        Mail::fake();
+        $user = User::factory()->create(['email' => 'test@example.com']);
+
+        $sendKey = 'otp-send:'.$user->email;
+        $resendKey = 'otp-resend:'.mb_strtolower($user->email);
+        RateLimiter::clear($sendKey);
+        RateLimiter::clear($resendKey);
+
+        // 5x sendOtp sukses → hit resend key
+        for ($i = 0; $i < 5; $i++) {
+            RateLimiter::clear($sendKey);
+            $resp = $this->postJson(route('password.otp.send'), [
+                'email' => $user->email,
+            ]);
+            $resp->assertOk();
+        }
+
+        // Request ke-6 → 429 rate-limited
+        RateLimiter::clear($sendKey);
+        $resp = $this->postJson(route('password.otp.send'), [
+            'email' => $user->email,
+        ]);
+        $resp->assertStatus(429);
+        $resp->assertJson(['error' => 'rate-limited']);
+        $resp->assertJsonStructure(['retryAfter']);
+
+        RateLimiter::clear($resendKey);
+    }
+
+    public function test_successful_verify_clears_verify_rate_limit(): void
+    {
+        $user = User::factory()->create(['email' => 'test@example.com']);
+
+        DB::table('password_reset_tokens')->insert([
+            'email' => $user->email,
+            'token' => hash('sha256', '123456'),
+            'created_at' => now(),
+        ]);
+
+        $key = 'otp-verify:'.mb_strtolower($user->email);
+        RateLimiter::clear($key);
+
+        // Hit limiter 2x dengan OTP salah
+        for ($i = 0; $i < 2; $i++) {
+            $this->postJson(route('password.otp.verify'), [
+                'email' => $user->email,
+                'otp' => '000000',
+            ]);
+        }
+        $this->assertSame(2, RateLimiter::attempts($key));
+
+        // Verifikasi dengan OTP benar → clear
+        $resp = $this->postJson(route('password.otp.verify'), [
+            'email' => $user->email,
+            'otp' => '123456',
+        ]);
+        $resp->assertOk();
+        $this->assertSame(0, RateLimiter::attempts($key));
+
+        RateLimiter::clear($key);
     }
 }

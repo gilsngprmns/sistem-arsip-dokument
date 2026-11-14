@@ -2,8 +2,8 @@
 
 namespace App\Services\Backup;
 
+use App\Models\BoksArsip;
 use App\Models\DokumenArsip;
-use App\Models\LokasiArsip;
 use App\Models\RakArsip;
 use App\Models\RiwayatSirkulasi;
 use App\Models\Seksi;
@@ -57,10 +57,10 @@ class BundleBackupService
             'seksi' => Seksi::all()
                 ->map(fn ($m) => Arr::except($m->toArray(), ['created_at', 'updated_at']))
                 ->values()->all(),
-            'lokasi_arsip' => LokasiArsip::all()
+            'rak_arsip' => RakArsip::all()
                 ->map(fn ($m) => Arr::except($m->toArray(), ['created_at', 'updated_at']))
                 ->values()->all(),
-            'rak_arsip' => RakArsip::all()
+            'boks_arsip' => BoksArsip::all()
                 ->map(fn ($m) => Arr::except($m->toArray(), ['created_at', 'updated_at']))
                 ->values()->all(),
             'dokumen_arsip' => DokumenArsip::withTrashed()->with('riwayatSirkulasi')
@@ -142,7 +142,7 @@ class BundleBackupService
         $namaFile = 'backup-arsip-'.now()->format('Ymd-His').'.zip';
         $rincian = [
             'seksi' => count($payload['seksi']),
-            'lokasi_arsip' => count($payload['lokasi_arsip']),
+            'boks_arsip' => count($payload['boks_arsip'] ?? []),
             'rak_arsip' => count($payload['rak_arsip']),
             'dokumen_arsip' => count($payload['dokumen_arsip']),
             'riwayat_sirkulasi' => collect($payload['dokumen_arsip'])->sum(fn (array $d) => count($d['riwayat_sirkulasi'] ?? [])),
@@ -248,6 +248,43 @@ class BundleBackupService
         usort($daftar, fn (array $a, array $b) => strcmp($b['diambil_pada'], $a['diambil_pada']));
 
         return array_slice($daftar, 0, $limit);
+    }
+
+    /**
+     * Hapus satu atau beberapa bundel backup berdasarkan nama filenya.
+     *
+     * Menghapus berkas ZIP/JSON beserta sidecar manifest-nya.
+     *
+     * @param  array<string>  $namaFile  Nama file backup yang akan dihapus
+     * @return int Jumlah file yang berhasil dihapus
+     */
+    public function deleteBundles(array $namaFile): int
+    {
+        $dir = config('backup.path');
+        if (! is_dir($dir)) {
+            return 0;
+        }
+
+        $dihapus = 0;
+        foreach ($namaFile as $name) {
+            $name = basename($name); // cegah path traversal
+            if (! preg_match('/^backup-arsip-[0-9]{8}-[0-9]{6}\.(json|zip)$/', $name)) {
+                continue;
+            }
+            $zipPath = $dir.'/'.$name;
+            if (File::exists($zipPath)) {
+                File::delete($zipPath);
+                $dihapus++;
+            }
+            // juga hapus sidecar manifest jika ada
+            $manifestPath = $zipPath.'.manifest.json';
+            if (File::exists($manifestPath)) {
+                File::delete($manifestPath);
+                $dihapus++;
+            }
+        }
+
+        return $dihapus;
     }
 
     /**
@@ -417,31 +454,19 @@ class BundleBackupService
 
         $skipped = [];
         $peringatan = [];
-        $statRef = ['lokasi' => $this->stat(), 'seksi' => $this->stat(), 'rak' => $this->stat()];
+        $statRef = ['boks' => $this->stat(), 'seksi' => $this->stat(), 'rak' => $this->stat()];
         $statDok = $this->stat();
         $statRiwayat = $this->stat() + ['disalin' => 0];
         $statFile = ['disalin' => 0, 'dilewati' => 0];
 
-        $petaLokasi = [];
+        $petaBoks = [];
         $petaSeksi = [];
         $petaRak = [];
 
-        DB::transaction(function () use ($payload, $dryRun, $userHidup, &$skipped, &$peringatan, &$statRef, &$statDok, &$statRiwayat, &$riwayatHidup, &$petaLokasi, &$petaSeksi, &$petaRak): void {
+        DB::transaction(function () use ($payload, $dryRun, $userHidup, &$skipped, &$peringatan, &$statRef, &$statDok, &$statRiwayat, &$riwayatHidup, &$petaBoks, &$petaSeksi, &$petaRak): void {
             $riwayatAntre = []; // kode_arsip => daftar baris riwayat (tanpa id, kunci dokumen sumber)
 
-            // — 1. Lokasi (kunci: kode_lokasi) —
-            foreach (($payload['lokasi_arsip'] ?? []) as $row) {
-                if (! is_array($row) || empty($row['kode_lokasi'])) {
-                    continue;
-                }
-                $petaLokasi[$row['id'] ?? null] = $this->upsertReferensi(
-                    LokasiArsip::class, 'kode_lokasi', $row,
-                    ['nama_lokasi', 'gedung', 'lantai', 'ruangan', 'deskripsi', 'is_active'],
-                    $dryRun, $statRef['lokasi'],
-                );
-            }
-
-            // — 2. Seksi (kunci: nama_seksi) —
+            // — 1. Seksi (kunci: nama_seksi) —
             foreach (($payload['seksi'] ?? []) as $row) {
                 if (! is_array($row) || empty($row['nama_seksi'])) {
                     continue;
@@ -453,36 +478,54 @@ class BundleBackupService
                 );
             }
 
-            // — 3. Rak (kunci: kode_rak) dengan remap FK lokasi & seksi —
+            // — 2. Rak (kunci: kode_rak) dengan remap FK seksi —
             foreach (($payload['rak_arsip'] ?? []) as $row) {
                 if (! is_array($row) || empty($row['kode_rak'])) {
                     continue;
                 }
 
                 $id = $row['id'] ?? null;
-                $lokasiLama = $row['lokasi_id'] ?? null;
                 $seksiLama = $row['seksi_id'] ?? null;
-
-                if ($lokasiLama !== null && ! array_key_exists($lokasiLama, $petaLokasi)) {
-                    $this->catatSkip($skipped, 'rak '.$row['kode_rak'], 'merujuk lokasi (id '.$lokasiLama.') yang tidak ada di sistem ini');
-                    continue;
-                }
 
                 $fields = [
                     'nama_rak' => $row['nama_rak'] ?? null,
                     'nomor_rak' => $row['nomor_rak'] ?? null,
-                    'kapasitas' => $row['kapasitas'] ?? null,
                     'deskripsi' => $row['deskripsi'] ?? null,
                     'is_active' => $row['is_active'] ?? true,
-                    'lokasi_id' => $lokasiLama !== null ? $petaLokasi[$lokasiLama] : null,
                     'seksi_id' => $seksiLama !== null ? ($petaSeksi[$seksiLama] ?? null) : null,
                 ];
 
                 $petaRak[$id] = $this->upsertReferensi(
                     RakArsip::class, 'kode_rak', $row,
-                    ['nama_rak', 'nomor_rak', 'kapasitas', 'deskripsi', 'is_active', 'lokasi_id', 'seksi_id'],
+                    ['nama_rak', 'nomor_rak', 'deskripsi', 'is_active', 'seksi_id'],
                     $dryRun,
                     $statRef['rak'],
+                    fieldsOverride: $fields,
+                );
+            }
+
+            // — 3. Boks (kunci: kode_boks) dengan remap FK rak —
+            foreach (($payload['boks_arsip'] ?? []) as $row) {
+                if (! is_array($row) || empty($row['kode_boks'])) {
+                    continue;
+                }
+
+                $id = $row['id'] ?? null;
+                $rakLama = $row['rak_id'] ?? null;
+
+                $fields = [
+                    'rak_id' => $rakLama !== null ? ($petaRak[$rakLama] ?? null) : null,
+                    'kapasitas' => $row['kapasitas'] ?? null,
+                    'nomor_baris' => $row['nomor_baris'] ?? null,
+                    'nomor_boks' => $row['nomor_boks'] ?? null,
+                    'keterangan' => $row['keterangan'] ?? null,
+                    'is_active' => $row['is_active'] ?? true,
+                ];
+
+                $petaBoks[$id] = $this->upsertReferensi(
+                    BoksArsip::class, 'kode_boks', $row,
+                    ['rak_id', 'kapasitas', 'nomor_baris', 'nomor_boks', 'keterangan', 'is_active'],
+                    $dryRun, $statRef['boks'],
                     fieldsOverride: $fields,
                 );
             }
@@ -519,6 +562,15 @@ class BundleBackupService
                     } else {
                         $payloadBaris['rak_id'] = null;
                         $peringatan[] = $kode.': rak sumber tidak ada di sistem ini — posisi rak dikosongkan';
+                    }
+                }
+
+                $boksLama = $payloadBaris['boks_id'] ?? null;
+                if ($boksLama !== null) {
+                    if (array_key_exists($boksLama, $petaBoks)) {
+                        $payloadBaris['boks_id'] = $petaBoks[$boksLama];
+                    } else {
+                        $payloadBaris['boks_id'] = null;
                     }
                 }
 

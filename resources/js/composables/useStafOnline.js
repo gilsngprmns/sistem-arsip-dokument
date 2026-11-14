@@ -3,15 +3,13 @@ import { computed, ref } from 'vue';
 import { usePage } from '@inertiajs/vue3';
 
 // ===== State modular (singleton) =====
-// AppLayout (pill header + toast) dan Dashboard (panel Staf Aktif) sama-sama
+// AppLayout (badge presence header) dan Dashboard (panel Staf Aktif) sama-sama
 // memanggil useStafOnline(). Module scope => state & timer berbagi, satu
 // interval, tidak double-poll.
 //
-// Catatan desain: `pollOnNewStaff` selalu di-set oleh AppLayout (via
-// `useStafOnline(staff => stafToast.value?.addToast(staff))`) karena
-// AppLayout adalah layout terluar yang mounting di semua halaman
-// terautentikasi. Dashboard memanggil `useStafOnline()` tanpa argumen
-// hanya untuk data; toast tetap ter-trigger dari AppLayout.
+// `pollOnNewStaff` (parameter opsional, default null) bisa di-set bila ada
+// consumer lain yang ingin callback saat staf baru terdeteksi. AppLayout saat
+// ini hanya mengambil count, tidak trigger callback.
 //
 // Timer tidak di-unbind saat halaman berganti: Inertia SPAs sering
 // re-mount komponen saat navigasi, tapi satu timer global lebih

@@ -19,7 +19,6 @@ class DatabaseSeeder extends Seeder
     {
         $this->call([
             SeksiSeeder::class,
-            LokasiArsipSeeder::class,
             RakArsipSeeder::class,
         ]);
 

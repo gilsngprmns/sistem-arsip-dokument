@@ -587,6 +587,33 @@ onBeforeUnmount(() => {
                     />
                     <span v-show="!collapsed" class="truncate">Rak</span>
                 </Link>
+
+                <Link
+                    :href="route('boks.index')"
+                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                    :class="[
+                        route().current('boks.*')
+                            ? 'bg-white/10 font-medium text-white'
+                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
+                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
+                    ]"
+                    :aria-label="collapsed ? 'Boks Arsip' : undefined"
+                    @mouseenter="showTip($event, 'Boks Arsip')"
+                    @mousemove="showTip($event, 'Boks Arsip')"
+                    @mouseleave="hideTip()"
+                    @focus="showTip($event, 'Boks Arsip')"
+                    @blur="hideTip()"
+                    @click="onNavClick"
+                >
+                    <AppIcon
+                        name="box"
+                        :size="20"
+                        :stroke-width="1.8"
+                        :class="['h-5 w-5 shrink-0', route().current('boks.*') ? 'text-emerald-400' : 'text-slate-400']"
+                        decorative
+                    />
+                    <span v-show="!collapsed" class="truncate">Boks</span>
+                </Link>
             </div>
 
             <!-- GRUP ADMIN: ADMINISTRASI -->
@@ -608,11 +635,11 @@ onBeforeUnmount(() => {
                             : 'text-slate-300 hover:bg-white/5 hover:text-white',
                         collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
                     ]"
-                    :aria-label="collapsed ? 'Management User' : undefined"
-                    @mouseenter="showTip($event, 'Management User')"
-                    @mousemove="showTip($event, 'Management User')"
+                    :aria-label="collapsed ? 'Manajemen Pengguna' : undefined"
+                    @mouseenter="showTip($event, 'Manajemen Pengguna')"
+                    @mousemove="showTip($event, 'Manajemen Pengguna')"
                     @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Management User')"
+                    @focus="showTip($event, 'Manajemen Pengguna')"
                     @blur="hideTip()"
                     @click="onNavClick"
                 >
@@ -623,7 +650,7 @@ onBeforeUnmount(() => {
                         :class="['h-5 w-5 shrink-0', route().current('users.*') ? 'text-emerald-400' : 'text-slate-400']"
                         decorative
                     />
-                    <span v-show="!collapsed" class="truncate">Management User</span>
+                    <span v-show="!collapsed" class="truncate">Manajemen Pengguna</span>
                 </Link>
 
                 <Link
@@ -635,11 +662,11 @@ onBeforeUnmount(() => {
                             : 'text-slate-300 hover:bg-white/5 hover:text-white',
                         collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
                     ]"
-                    :aria-label="collapsed ? 'Log Activity' : undefined"
-                    @mouseenter="showTip($event, 'Log Activity')"
-                    @mousemove="showTip($event, 'Log Activity')"
+                    :aria-label="collapsed ? 'Log Aktivitas' : undefined"
+                    @mouseenter="showTip($event, 'Log Aktivitas')"
+                    @mousemove="showTip($event, 'Log Aktivitas')"
                     @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Log Activity')"
+                    @focus="showTip($event, 'Log Aktivitas')"
                     @blur="hideTip()"
                     @click="onNavClick"
                 >
@@ -650,7 +677,7 @@ onBeforeUnmount(() => {
                         :class="['h-5 w-5 shrink-0', route().current('activity.*') ? 'text-emerald-400' : 'text-slate-400']"
                         decorative
                     />
-                    <span v-show="!collapsed" class="truncate">Log Activity</span>
+                    <span v-show="!collapsed" class="truncate">Log Aktivitas</span>
                 </Link>
 
                 <Link
@@ -662,11 +689,11 @@ onBeforeUnmount(() => {
                             : 'text-slate-300 hover:bg-white/5 hover:text-white',
                         collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
                     ]"
-                    :aria-label="collapsed ? 'Cadangkan / Pulihkan' : undefined"
-                    @mouseenter="showTip($event, 'Cadangkan / Pulihkan')"
-                    @mousemove="showTip($event, 'Cadangkan / Pulihkan')"
+                    :aria-label="collapsed ? 'Cadangkan & Pulihkan' : undefined"
+                    @mouseenter="showTip($event, 'Cadangkan & Pulihkan')"
+                    @mousemove="showTip($event, 'Cadangkan & Pulihkan')"
                     @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Cadangkan / Pulihkan')"
+                    @focus="showTip($event, 'Cadangkan & Pulihkan')"
                     @blur="hideTip()"
                     @click="onNavClick"
                 >
@@ -677,7 +704,7 @@ onBeforeUnmount(() => {
                         :class="['h-5 w-5 shrink-0', route().current('backup.*') ? 'text-emerald-400' : 'text-slate-400']"
                         decorative
                     />
-                    <span v-show="!collapsed" class="truncate">Cadangkan / Pulihkan</span>
+                    <span v-show="!collapsed" class="truncate">Cadangkan & Pulihkan</span>
                 </Link>
 
                 <!-- Halaman Publik — toggle + sub-list -->

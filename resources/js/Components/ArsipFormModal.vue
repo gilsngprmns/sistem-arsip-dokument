@@ -25,8 +25,16 @@ const props = defineProps({
         type: Array,
         default: () => [],
     },
+    boksList: {
+        type: Array,
+        default: () => [],
+    },
     initialData: {
         type: Object,
+        default: null,
+    },
+    onFinish: {
+        type: Function,
         default: null,
     },
 });
@@ -63,14 +71,17 @@ const emptyForm = () => ({
     tujuan_instansi: '',
     seksi_id: mySeksiId.value ? String(mySeksiId.value) : (resolvedSeksiList.value[0]?.id ?? ''),
     rak_id: '',
-    nomor_box: '',
-    nomor_map: '',
-    nomor_slot: '',
+    boks_id: '',
     catatan: '',
     lampiran: null,
 });
 
 const form = useForm(emptyForm());
+
+const filteredBoksList = computed(() => {
+    if (!form.rak_id) return [];
+    return (props.boksList ?? []).filter((boks) => Number(boks.rak_id) === Number(form.rak_id));
+});
 const selectedFileName = computed(() => {
     if (form.lampiran && typeof form.lampiran === 'object' && form.lampiran.name) {
         return form.lampiran.name;
@@ -114,9 +125,7 @@ const fillForm = () => {
                   tujuan_instansi: props.initialData.tujuan_instansi ?? '',
                   seksi_id: props.initialData.seksi_id ?? '',
                   rak_id: props.initialData.rak_id ?? '',
-                  nomor_box: props.initialData.nomor_box ?? '',
-                  nomor_map: props.initialData.nomor_map ?? '',
-                  nomor_slot: props.initialData.nomor_slot ?? '',
+                  boks_id: props.initialData.boks_id ?? '',
                   catatan: props.initialData.catatan ?? '',
                   lampiran: null,
               }
@@ -142,6 +151,18 @@ watch(
         const stillValid = filteredRakList.value.some((rak) => Number(rak.id) === Number(form.rak_id));
         if (!stillValid) {
             form.rak_id = '';
+            form.boks_id = '';
+        }
+    },
+);
+
+watch(
+    () => form.rak_id,
+    () => {
+        if (!form.boks_id) return;
+        const stillValid = filteredBoksList.value.some((boks) => Number(boks.id) === Number(form.boks_id));
+        if (!stillValid) {
+            form.boks_id = '';
         }
     },
 );
@@ -154,10 +175,13 @@ const onFileChange = (event) => {
 };
 
 const submit = () => {
-    const options = {
+    const successOptions = {
         forceFormData: true,
         preserveScroll: true,
-        onSuccess: () => close(),
+        onSuccess: () => {
+            close();
+            props.onFinish?.();
+        },
     };
 
     form.transform((data) => {
@@ -168,12 +192,12 @@ const submit = () => {
     if (props.mode === 'edit' && props.initialData?.id) {
         form.transform((data) => ({ ...data, _method: 'put' })).post(
             route('arsip.update', props.initialData.id),
-            { forceFormData: true, preserveScroll: true, onSuccess: () => close() },
+            successOptions,
         );
         return;
     }
 
-    form.post(route('arsip.store'), options);
+    form.post(route('arsip.store'), successOptions);
 };
 </script>
 
@@ -339,9 +363,21 @@ const submit = () => {
             </div>
 
             <div>
-                <InputLabel for="rak_id" value="Rak Penyimpanan" />
-                <select id="rak_id" v-model="form.rak_id" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm">
-                    <option value="">Belum ditempatkan</option>
+                <InputLabel for="gedung_label" value="Gedung" />
+                <input
+                    id="gedung_label"
+                    type="text"
+                    value="Gedung Kelurahan Grogol Selatan"
+                    disabled
+                    class="mt-1 block w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500 cursor-not-allowed"
+                />
+                <p class="mt-1 text-xs text-slate-400">Satu gedung arsip kelurahan — tidak dapat diubah.</p>
+            </div>
+
+            <div>
+                <InputLabel for="rak_id" value="Rak Penyimpanan *" />
+                <select id="rak_id" v-model="form.rak_id" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm" required>
+                    <option value="" disabled>Pilih rak</option>
                     <option v-for="rak in filteredRakList" :key="rak.id" :value="rak.id">
                         {{ rak.kode_rak }} — No. {{ rak.nomor_rak || '—' }} · {{ rak.nama_rak }}
                     </option>
@@ -350,19 +386,17 @@ const submit = () => {
                 <InputError class="mt-1" :message="form.errors.rak_id" />
             </div>
 
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                <div>
-                    <InputLabel for="nomor_box" value="Nomor Box" />
-                    <TextInput id="nomor_box" v-model="form.nomor_box" class="mt-1 block w-full" placeholder="Contoh: B-01 atau Box-A" />
-                </div>
-                <div>
-                    <InputLabel for="nomor_map" value="Nomor Map" />
-                    <TextInput id="nomor_map" v-model="form.nomor_map" class="mt-1 block w-full" placeholder="Contoh: Map Merah 01" />
-                </div>
-                <div>
-                    <InputLabel for="nomor_slot" value="Nomor Slot" />
-                    <TextInput id="nomor_slot" v-model="form.nomor_slot" class="mt-1 block w-full" placeholder="Contoh: S-12" />
-                </div>
+            <div>
+                <InputLabel for="boks_id" value="Boks Penyimpanan *" />
+                <select id="boks_id" v-model="form.boks_id" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm" required>
+                    <option value="" disabled>{{ form.rak_id ? 'Pilih boks' : 'Pilih rak terlebih dahulu' }}</option>
+                    <option v-for="boks in filteredBoksList" :key="boks.id" :value="boks.id">
+                        {{ boks.kode_boks }} — Baris {{ boks.nomor_baris || '—' }} · Boks {{ boks.nomor_boks || '—' }}
+                        (Terisi: {{ boks.dokumen_arsip_count ?? 0 }}/{{ boks.kapasitas ?? '—' }})
+                    </option>
+                </select>
+                <p v-if="!form.rak_id" class="mt-1 text-xs text-slate-500">Pilih rak terlebih dahulu untuk menampilkan boks yang tersedia.</p>
+                <InputError class="mt-1" :message="form.errors.boks_id" />
             </div>
 
             <div>

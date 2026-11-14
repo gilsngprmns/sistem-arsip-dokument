@@ -2,7 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\BoksArsip;
 use App\Models\DokumenArsip;
+use App\Models\RakArsip;
 use App\Models\Seksi;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -146,6 +148,8 @@ class SeksiAccessTest extends TestCase
     public function test_staff_can_create_document_in_own_seksi(): void
     {
         [$staf, $seksiA, $seksiB] = $this->createStaf('Pemerintahan');
+        $rak  = RakArsip::create(['seksi_id' => $seksiA->id, 'kode_rak' => 'RAK-OWN', 'nama_rak' => 'Rak Own', 'is_active' => true]);
+        $boks = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-OWN', 'kapasitas' => 10, 'is_active' => true]);
 
         $response = $this->actingAs($staf)->post('/arsip', [
             'kode_arsip' => 'ARSIP-OWN-' . uniqid(),
@@ -155,6 +159,8 @@ class SeksiAccessTest extends TestCase
             'sifat_surat' => 'biasa',
             'tanggal_surat' => '2026-01-01',
             'seksi_id' => $seksiA->id,
+            'rak_id' => $rak->id,
+            'boks_id' => $boks->id,
         ]);
 
         $response->assertRedirect('/arsip');
@@ -184,6 +190,8 @@ class SeksiAccessTest extends TestCase
     {
         [$staf, $seksiA, $seksiB] = $this->createStaf('Pemerintahan');
         $admin = User::factory()->create(['role' => 'admin']);
+        $rak  = RakArsip::create(['seksi_id' => $seksiB->id, 'kode_rak' => 'RAK-ADMIN', 'nama_rak' => 'Rak Admin', 'is_active' => true]);
+        $boks = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-ADMIN', 'is_active' => true]);
 
         $response = $this->actingAs($admin)->post('/arsip', [
             'kode_arsip' => 'ARSIP-ADMIN-' . uniqid(),
@@ -193,6 +201,8 @@ class SeksiAccessTest extends TestCase
             'sifat_surat' => 'biasa',
             'tanggal_surat' => '2026-01-01',
             'seksi_id' => $seksiB->id,
+            'rak_id' => $rak->id,
+            'boks_id' => $boks->id,
         ]);
 
         $response->assertRedirect('/arsip');
