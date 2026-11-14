@@ -16,7 +16,7 @@ export const institution = {
     address:
         'Jl. Rawa Simprug VIII No.1, RT.9/RW.10, Grogol Selatan, Kec. Kebayoran Lama, Jakarta Selatan 12220',
     officeHours: 'Senin–Jumat, 08.00–16.00 WIB',
-    phone: '(021) 727-866-29',
+    phone: '021 - 7210317',
     email: 'kominfotikjs@jakarta.go.id',
     /** Link buka di Google Maps (Share) */
     mapsUrl: 'https://maps.app.goo.gl/xTom3WqUEhR7KhC37',
