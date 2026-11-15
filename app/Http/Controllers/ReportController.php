@@ -24,7 +24,8 @@ class ReportController extends Controller
         $activities = ActivityLog::query()->with('user:id,name')
             ->whereNotIn('route_name', ['password.request', 'password.otp.send', 'password.otp.verify', 'password.otp.reset', 'password.confirm', 'verification.send'])
             ->filterByRequest($request)
-            ->latest()
+            ->orderByDesc('created_at')
+            ->orderByDesc('id')
             ->get();
 
         return Excel::download(

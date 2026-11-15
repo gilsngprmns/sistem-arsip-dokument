@@ -1,8 +1,9 @@
 <script setup>
 import { institution } from '@/config/institution';
 import { Link, usePage } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import ImageLightbox from '@/Components/ImageLightbox.vue';
+import SidebarNavItem from '@/Components/SidebarNavItem.vue';
 
 const props = defineProps({
     activeSeksiId: {
@@ -148,6 +149,8 @@ const onNavClick = () => {
 // Satu elemen bersama, dirender via <Teleport to="body"> + position:fixed agar lolos dari
 // overflow rail aside DAN dari `transform` drawer mobile (containing block fixed).
 // Hanya aktif di instans desktop (collapsed); instans mobile selalu collapsed=false.
+// Dipakai untuk tombol utilitas (logo, close, collapse, gear, keluar); item menu
+// memakai tooltip milik SidebarNavItem.
 const tip = ref({ show: false, text: '', top: 0, left: 0 });
 
 const showTip = (event, text, always = false) => {
@@ -195,86 +198,14 @@ const closeLightbox = () => {
     lightbox.value.show = false;
 };
 
-/* ============ Skeleton loading ============ */
-const SKELETON_MS = 1000;
-const isLoading = ref(true);
-let skeletonTimer = null;
-
-const armSkeleton = () => {
-    if (skeletonTimer) clearTimeout(skeletonTimer);
-    skeletonTimer = setTimeout(() => { isLoading.value = false; skeletonTimer = null; }, SKELETON_MS);
-};
-
-onMounted(armSkeleton);
-
-watch(
-    () => page.url,
-    () => {
-        if (isLoading.value) return;
-        isLoading.value = true;
-        armSkeleton();
-    }
-);
-
-onBeforeUnmount(() => {
-    if (skeletonTimer) clearTimeout(skeletonTimer);
-});
 </script>
 
 <template>
     <aside
         :id="sidebarId"
-        :aria-busy="isLoading"
-        class="flex h-screen shrink-0 flex-col overflow-hidden bg-brand-navy text-white transition-[width] duration-300 ease-in-out"
+        class="flex h-screen flex-col overflow-hidden bg-brand-navy text-white transition-[width] duration-300 ease-in-out lg:h-screen h-dvh"
         :class="collapsed ? 'w-[80px]' : 'w-[260px]'"
     >
-        <!-- SKELETON LOADING -->
-        <div
-            v-if="isLoading"
-            role="status"
-            aria-live="polite"
-            class="flex h-screen flex-col overflow-hidden bg-brand-navy text-white"
-            :class="collapsed ? 'w-[80px]' : 'w-[260px]'"
-        >
-            <span class="sr-only">Memuat menu navigasi…</span>
-            <!-- Header: logo + teks placeholder -->
-            <div class="shrink-0 border-b border-white/10 py-3 motion-safe:animate-pulse" :class="collapsed ? 'px-2' : 'px-4'">
-                <div class="flex" :class="collapsed ? 'flex-col items-center gap-2' : 'items-center gap-3'">
-                    <div class="h-9 w-9 shrink-0 rounded-full bg-slate-500" />
-                    <div v-show="!collapsed" class="min-w-0 flex-1">
-                        <div class="h-4 w-32 rounded bg-slate-600" />
-                        <div class="mt-1 h-3 w-40 rounded bg-slate-500" />
-                    </div>
-                </div>
-            </div>
-            <!-- Menu: grup placeholder -->
-            <div class="min-h-0 flex-1 overflow-hidden py-3 motion-safe:animate-pulse" :class="collapsed ? 'px-2' : 'px-3'">
-                <div v-for="i in 4" :key="'skeleton-grp-' + i" class="flex flex-col gap-1" :class="i < 4 ? 'mb-4' : ''">
-                    <div class="mb-1.5 px-3">
-                        <div class="h-3 w-16 rounded bg-slate-500" />
-                    </div>
-                    <div class="rounded-lg py-2" :class="collapsed ? 'px-2' : 'px-3'">
-                        <div class="h-5 w-5 rounded bg-slate-500" :class="!collapsed && 'mr-2.5'" />
-                    </div>
-                    <div class="rounded-lg py-2" :class="collapsed ? 'px-2' : 'px-3'">
-                        <div class="h-5 w-5 rounded bg-slate-500" :class="!collapsed && 'mr-2.5'" />
-                    </div>
-                </div>
-            </div>
-            <!-- Bottom: profil + logout -->
-            <div class="shrink-0 border-t border-white/10 py-3 motion-safe:animate-pulse" :class="collapsed ? 'px-2' : 'px-3'">
-                <div class="flex" :class="collapsed ? 'flex-col items-center gap-1' : 'items-center gap-2.5'">
-                    <div class="h-8 w-8 shrink-0 rounded-full bg-slate-500" />
-                    <div v-show="!collapsed" class="min-w-0 flex-1">
-                        <div class="h-3 w-24 rounded bg-slate-500" />
-                    </div>
-                </div>
-                <div class="mt-2 h-5 w-full rounded bg-slate-600" />
-            </div>
-        </div>
-
-        <!-- KONTEN ASLI -->
-        <template v-else>
         <div
             class="shrink-0 border-b border-white/10 py-3 transition-[padding] duration-300"
             :class="collapsed ? 'px-2' : 'px-4'"
@@ -285,7 +216,7 @@ onBeforeUnmount(() => {
             >
                 <button
                     type="button"
-                    class="h-9 w-9 shrink-0 rounded-full bg-white p-0.5 transition-colors hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                    class="h-9 w-9 shrink-0 rounded-full bg-white p-0.5 transition-all duration-200 ease-out hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                     :aria-label="`Perbesar logo ${institution.name}`"
                     @click="openLightbox(institution.logoPath, institution.name)"
                 >
@@ -305,7 +236,7 @@ onBeforeUnmount(() => {
                 <button
                     v-if="showClose"
                     type="button"
-                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-all duration-200 ease-out hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                     aria-label="Tutup menu"
                     @click="emit('close')"
                 >
@@ -314,7 +245,7 @@ onBeforeUnmount(() => {
                 <button
                     v-else-if="collapsible"
                     type="button"
-                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                    class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-300 transition-all duration-200 ease-out hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                     :aria-label="collapsed ? 'Perluas menu' : 'Ciutkan menu'"
                     :aria-expanded="!collapsed"
                     :aria-controls="sidebarId"
@@ -339,7 +270,7 @@ onBeforeUnmount(() => {
         <!-- Konten menu: satu-satunya area yang bisa scroll. Header (atas)
              dan pin profil/Keluar (bawah) tetap mengunci di tempat. -->
         <div
-            class="min-h-0 flex-1 overflow-y-auto py-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+            class="sidebar-menu-scroll min-h-0 flex-1 overscroll-contain overflow-y-auto py-3"
             :class="collapsed ? 'px-2' : 'px-3'"
         >
             <!-- GRUP MAIN -->
@@ -352,73 +283,30 @@ onBeforeUnmount(() => {
                 </p>
 
                 <!-- Dashboard -->
-                <Link
+                <SidebarNavItem
+                    icon="dashboard"
+                    label="Dashboard"
                     :href="route('dashboard')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('dashboard')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Dashboard' : undefined"
-                    @mouseenter="showTip($event, 'Dashboard')"
-                    @mousemove="showTip($event, 'Dashboard')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Dashboard')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="dashboard"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('dashboard') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Dashboard</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('dashboard')"
+                    @navigate="onNavClick"
+                />
 
-                <!-- Semua Dokumen + chevron -->
+                <!-- Semua Dokumen + accordion toggle -->
                 <div class="flex items-center gap-0.5">
-                    <Link
+                    <SidebarNavItem
+                        icon="archive"
+                        label="Semua Dokumen"
                         :href="route('arsip.index')"
-                        class="flex min-w-0 flex-1 items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                        :class="[
-                            isAllDocumentsActive
-                                ? 'bg-white/10 font-medium text-white'
-                                : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                            collapsed ? 'justify-center px-2' : 'justify-between gap-2 px-3',
-                        ]"
-                        :aria-label="collapsed ? 'Semua Dokumen' : undefined"
-                        @mouseenter="showTip($event, 'Semua Dokumen')"
-                        @mousemove="showTip($event, 'Semua Dokumen')"
-                        @mouseleave="hideTip()"
-                        @focus="showTip($event, 'Semua Dokumen')"
-                        @blur="hideTip()"
-                        @click="onNavClick"
-                    >
-                        <span class="flex min-w-0 items-center" :class="collapsed ? '' : 'gap-2.5'">
-                            <AppIcon
-                                name="archive"
-                                :size="20"
-                                :stroke-width="1.8"
-                                :class="['h-5 w-5 shrink-0', isAllDocumentsActive ? 'text-emerald-400' : 'text-slate-400']"
-                                decorative
-                            />
-                            <span v-show="!collapsed" class="truncate">Semua Dokumen</span>
-                        </span>
-                        <span
-                            v-show="!collapsed"
-                            class="shrink-0 text-[11px] text-slate-400"
-                        >
-                            {{ seksiCounts.all }}
-                        </span>
-                    </Link>
+                        :rail="collapsed"
+                        :active="isAllDocumentsActive"
+                        :count="seksiCounts.all"
+                        @navigate="onNavClick"
+                    />
                     <button
                         v-show="!collapsed"
                         type="button"
-                        class="inline-flex h-8 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                        class="inline-flex h-8 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-all duration-200 ease-out hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                         :aria-label="setExpanded ? 'Tutup daftar seksi' : 'Buka daftar seksi'"
                         :aria-expanded="setExpanded"
                         @click.stop="setExpanded = !setExpanded"
@@ -427,62 +315,35 @@ onBeforeUnmount(() => {
                             name="chevron-down"
                             :size="16"
                             :stroke-width="1.8"
-                            :class="['h-4 w-4 transition-transform duration-300', setExpanded ? 'rotate-180' : '']"
+                            :class="['h-4 w-4 transition-transform duration-200 ease-in-out', setExpanded ? 'rotate-180' : '']"
                             decorative
                         />
                     </button>
                 </div>
 
-                <!-- SUB-SEKSI: leading lines.
-                     Berada DI DALAM ALUR (in-flow): saat terbuka, seksi
-                     mendorong semua grup menu di bawahnya turun dan
-                     bottom pin ikut turun; aside yang overflow-y-auto
-                     mengurus gulirnya. Tidak lagi layer floating. -->
+                <!-- SUB-SEKSI: accordion halus. v-else dipasangkan dengan v-if
+                     pada div pembungkus agar Vue benar-benar melakukan enter/leave
+                     transition (v-show di elemen dalam transition v-if tidak
+                     trigger hooks); tinggi + opasitas ditangani enterHooks/leaveHooks. -->
                 <transition @enter="enterHooks" @leave="leaveHooks">
-                <div
-                    v-show="!collapsed && setExpanded"
-                    class="my-1 ml-4 space-y-1 overflow-hidden border-l border-slate-600/50 py-1 pl-4 transition-[height] duration-300 ease-in-out"
-                >
                     <div
-                        v-for="seksi in seksiList"
-                        :key="seksi.id"
-                        class="flex items-center rounded-lg py-2 px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                        :class="[
-                            isSeksiActive(seksi.id) && !isSeksiDisabled(seksi.id)
-                                ? 'bg-white/10 font-medium text-white'
-                                : isSeksiDisabled(seksi.id)
-                                    ? 'cursor-not-allowed opacity-40'
-                                    : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        ]"
-                        :aria-disabled="isSeksiDisabled(seksi.id) ? true : undefined"
-                        @mouseenter="!isSeksiDisabled(seksi.id) && showTip($event, seksiMeta(seksi.nama_seksi).full)"
-                        @mousemove="!isSeksiDisabled(seksi.id) && showTip($event, seksiMeta(seksi.nama_seksi).full)"
-                        @mouseleave="hideTip()"
-                        @focus="!isSeksiDisabled(seksi.id) && showTip($event, seksiMeta(seksi.nama_seksi).full)"
-                        @blur="hideTip()"
+                        v-if="!collapsed && setExpanded"
+                        class="my-1 ml-4 space-y-1 overflow-hidden border-l border-slate-600/50 py-1 pl-4 transition-[height,opacity] duration-200 ease-in-out"
                     >
-                        <Link
+                        <SidebarNavItem
+                            v-for="seksi in seksiList"
+                            :key="seksi.id"
+                            :icon="seksiMeta(seksi.nama_seksi).icon || 'folder'"
+                            :label="seksiMeta(seksi.nama_seksi).short"
                             :href="isSeksiDisabled(seksi.id) ? undefined : route('arsip.index', { seksi_id: seksi.id })"
-                            :tabindex="isSeksiDisabled(seksi.id) ? -1 : 0"
-                            class="flex items-center w-full min-w-0 rounded-lg focus:outline-none"
-                            @click="!isSeksiDisabled(seksi.id) && onNavClick()"
-                        >
-                            <AppIcon
-                                :name="seksiMeta(seksi.nama_seksi).icon || 'folder'"
-                                :size="20"
-                                :stroke-width="1.8"
-                                :class="['h-5 w-5 shrink-0', isSeksiActive(seksi.id) && !isSeksiDisabled(seksi.id) ? 'text-emerald-400' : 'text-slate-400']"
-                                decorative
-                            />
-                            <span v-show="!collapsed" class="ml-2 min-w-0 flex-1">
-                                <span class="truncate">{{ seksiMeta(seksi.nama_seksi).short }}</span>
-                                <span v-if="!isSeksiDisabled(seksi.id)" class="ml-1.5 text-[11px] text-slate-400">
-                                    {{ countForSeksi(seksi.id) }}
-                                </span>
-                            </span>
-                        </Link>
+                            :rail="collapsed"
+                            :active="isSeksiActive(seksi.id) && !isSeksiDisabled(seksi.id)"
+                            :disabled="isSeksiDisabled(seksi.id)"
+                            :count="!isSeksiDisabled(seksi.id) ? countForSeksi(seksi.id) : null"
+                            @navigate="onNavClick"
+                        />
                     </div>
-                </div>
+                    <div v-else />
                 </transition>
             </div>
 
@@ -496,59 +357,23 @@ onBeforeUnmount(() => {
                 </p>
                 <div v-if="collapsed" class="mx-2 my-2 border-t border-white/10" />
 
-                <Link
+                <SidebarNavItem
+                    icon="file-plus"
+                    label="Tambah Dokumen"
                     :href="route('arsip.create')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('arsip.create')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Tambah Dokumen' : undefined"
-                    @mouseenter="showTip($event, 'Tambah Dokumen')"
-                    @mousemove="showTip($event, 'Tambah Dokumen')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Tambah Dokumen')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="file-plus"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('arsip.create') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Tambah Dokumen</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('arsip.create')"
+                    @navigate="onNavClick"
+                />
 
-                <Link
+                <SidebarNavItem
+                    icon="scan"
+                    label="Pindai QR Berkas"
                     :href="route('scan.index')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('scan.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Pindai QR Berkas' : undefined"
-                    @mouseenter="showTip($event, 'Pindai QR Berkas')"
-                    @mousemove="showTip($event, 'Pindai QR Berkas')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Pindai QR Berkas')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="scan"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('scan.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Pindai QR Berkas</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('scan.*')"
+                    @navigate="onNavClick"
+                />
             </div>
 
             <!-- GRUP ADMIN: LOKASI ARSIP -->
@@ -561,59 +386,23 @@ onBeforeUnmount(() => {
                 </p>
                 <div v-if="collapsed" class="mx-2 my-2 border-t border-white/10" />
 
-                <Link
+                <SidebarNavItem
+                    icon="rak"
+                    label="Rak"
                     :href="route('rak.index')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('rak.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Rak Arsip' : undefined"
-                    @mouseenter="showTip($event, 'Rak Arsip')"
-                    @mousemove="showTip($event, 'Rak Arsip')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Rak Arsip')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="rak"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('rak.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Rak</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('rak.*')"
+                    @navigate="onNavClick"
+                />
 
-                <Link
+                <SidebarNavItem
+                    icon="box"
+                    label="Boks"
                     :href="route('boks.index')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('boks.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Boks Arsip' : undefined"
-                    @mouseenter="showTip($event, 'Boks Arsip')"
-                    @mousemove="showTip($event, 'Boks Arsip')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Boks Arsip')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="box"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('boks.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Boks</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('boks.*')"
+                    @navigate="onNavClick"
+                />
             </div>
 
             <!-- GRUP ADMIN: ADMINISTRASI -->
@@ -626,210 +415,87 @@ onBeforeUnmount(() => {
                 </p>
                 <div v-if="collapsed" class="mx-2 my-2 border-t border-white/10" />
 
-                <Link
+                <SidebarNavItem
+                    icon="users"
+                    label="Manajemen Pengguna"
                     :href="route('users.index')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('users.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Manajemen Pengguna' : undefined"
-                    @mouseenter="showTip($event, 'Manajemen Pengguna')"
-                    @mousemove="showTip($event, 'Manajemen Pengguna')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Manajemen Pengguna')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="users"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('users.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Manajemen Pengguna</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('users.*')"
+                    @navigate="onNavClick"
+                />
 
-                <Link
+                <SidebarNavItem
+                    icon="activity"
+                    label="Log Aktivitas"
                     :href="route('activity.index')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('activity.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Log Aktivitas' : undefined"
-                    @mouseenter="showTip($event, 'Log Aktivitas')"
-                    @mousemove="showTip($event, 'Log Aktivitas')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Log Aktivitas')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="activity"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('activity.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Log Aktivitas</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('activity.*')"
+                    @navigate="onNavClick"
+                />
 
-                <Link
+                <SidebarNavItem
+                    icon="backup"
+                    label="Cadangkan & Pulihkan"
                     :href="route('backup.index')"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('backup.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Cadangkan & Pulihkan' : undefined"
-                    @mouseenter="showTip($event, 'Cadangkan & Pulihkan')"
-                    @mousemove="showTip($event, 'Cadangkan & Pulihkan')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Cadangkan & Pulihkan')"
-                    @blur="hideTip()"
-                    @click="onNavClick"
-                >
-                    <AppIcon
-                        name="backup"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('backup.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="truncate">Cadangkan & Pulihkan</span>
-                </Link>
+                    :rail="collapsed"
+                    :active="route().current('backup.*')"
+                    @navigate="onNavClick"
+                />
 
                 <!-- Halaman Publik — toggle + sub-list -->
-                <button
-                    type="button"
-                    class="flex items-center rounded-lg py-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                    :class="[
-                        route().current('halaman-publik.*')
-                            ? 'bg-white/10 font-medium text-white'
-                            : 'text-slate-300 hover:bg-white/5 hover:text-white',
-                        collapsed ? 'justify-center px-2' : 'gap-2.5 px-3',
-                    ]"
-                    :aria-label="collapsed ? 'Halaman Publik' : undefined"
+                <SidebarNavItem
+                    icon="layout"
+                    label="Halaman Publik"
+                    mode="button"
+                    :rail="collapsed"
+                    chevron="down"
+                    :chevron-open="!collapsed && publikExpanded"
+                    :active="route().current('halaman-publik.*')"
                     :aria-expanded="!collapsed && publikExpanded"
-                    @mouseenter="showTip($event, 'Halaman Publik')"
-                    @mousemove="showTip($event, 'Halaman Publik')"
-                    @mouseleave="hideTip()"
-                    @focus="showTip($event, 'Halaman Publik')"
-                    @blur="hideTip()"
-                    @click="publikExpanded = !publikExpanded"
-                >
-                    <AppIcon
-                        name="layout"
-                        :size="20"
-                        :stroke-width="1.8"
-                        :class="['h-5 w-5 shrink-0', route().current('halaman-publik.*') ? 'text-emerald-400' : 'text-slate-400']"
-                        decorative
-                    />
-                    <span v-show="!collapsed" class="min-w-0 flex-1 truncate text-left">Halaman Publik</span>
-                    <AppIcon
-                        v-show="!collapsed"
-                        name="chevron-down"
-                        :size="16"
-                        :stroke-width="1.8"
-                        :class="['h-4 w-4 shrink-0 transition-transform duration-300', publikExpanded ? 'rotate-180' : '']"
-                        decorative
-                    />
-                </button>
+                    @toggle="publikExpanded = !publikExpanded"
+                    @navigate="onNavClick"
+                />
 
-                <!-- Sub-list Halaman Publik -->
+                <!-- Sub-list Halaman Publik: v-else pasang agar enter/leave
+                     transition benar-benar jalan; opasitas ikut halus. -->
                 <transition @enter="enterHooks" @leave="leaveHooks">
-                <div
-                    v-show="!collapsed && publikExpanded"
-                    class="my-1 ml-4 space-y-1 overflow-hidden border-l border-slate-600/50 py-1 pl-4 transition-[height] duration-300 ease-in-out"
-                >
-                    <Link
-                        :href="route('halaman-publik.beranda')"
-                        class="flex items-center rounded-lg py-2 px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                        :class="
-                            route().current('halaman-publik.beranda')
-                                ? 'bg-white/10 font-medium text-white'
-                                : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                        "
-                        @click="onNavClick"
+                    <div
+                        v-if="!collapsed && publikExpanded"
+                        class="my-1 ml-4 space-y-1 overflow-hidden border-l border-slate-600/50 py-1 pl-4 transition-[height,opacity] duration-200 ease-in-out"
                     >
-                        <AppIcon
-                            name="carousel"
-                            :size="20"
-                            :stroke-width="1.8"
-                            :class="['h-5 w-5 shrink-0', route().current('halaman-publik.beranda') ? 'text-emerald-400' : 'text-slate-400']"
-                            decorative
+                        <SidebarNavItem
+                            icon="carousel"
+                            label="Foto Carousel"
+                            :href="route('halaman-publik.beranda')"
+                            :active="route().current('halaman-publik.beranda')"
+                            @navigate="onNavClick"
                         />
-                        <span class="ml-2 min-w-0 flex-1 truncate">Foto Carousel</span>
-                    </Link>
 
-                    <Link
-                        :href="route('halaman-publik.manfaat')"
-                        class="flex items-center rounded-lg py-2 px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                        :class="
-                            route().current('halaman-publik.manfaat')
-                                ? 'bg-white/10 font-medium text-white'
-                                : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                        "
-                        @click="onNavClick"
-                    >
-                        <AppIcon
-                            name="manfaat"
-                            :size="20"
-                            :stroke-width="1.8"
-                            :class="['h-5 w-5 shrink-0', route().current('halaman-publik.manfaat') ? 'text-emerald-400' : 'text-slate-400']"
-                            decorative
+                        <SidebarNavItem
+                            icon="manfaat"
+                            label="Kartu Manfaat"
+                            :href="route('halaman-publik.manfaat')"
+                            :active="route().current('halaman-publik.manfaat')"
+                            @navigate="onNavClick"
                         />
-                        <span class="ml-2 min-w-0 flex-1 truncate">Kartu Manfaat</span>
-                    </Link>
 
-                    <Link
-                        :href="route('halaman-publik.alur-kerja')"
-                        class="flex items-center rounded-lg py-2 px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                        :class="
-                            route().current('halaman-publik.alur-kerja')
-                                ? 'bg-white/10 font-medium text-white'
-                                : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                        "
-                        @click="onNavClick"
-                    >
-                        <AppIcon
-                            name="alur"
-                            :size="20"
-                            :stroke-width="1.8"
-                            :class="['h-5 w-5 shrink-0', route().current('halaman-publik.alur-kerja') ? 'text-emerald-400' : 'text-slate-400']"
-                            decorative
+                        <SidebarNavItem
+                            icon="alur"
+                            label="Langkah Prosedur"
+                            :href="route('halaman-publik.alur-kerja')"
+                            :active="route().current('halaman-publik.alur-kerja')"
+                            @navigate="onNavClick"
                         />
-                        <span class="ml-2 min-w-0 flex-1 truncate">Langkah Prosedur</span>
-                    </Link>
 
-                    <Link
-                        :href="route('halaman-publik.faq')"
-                        class="flex items-center rounded-lg py-2 px-2 text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
-                        :class="
-                            route().current('halaman-publik.faq')
-                                ? 'bg-white/10 font-medium text-white'
-                                : 'text-slate-300 hover:bg-white/5 hover:text-white'
-                        "
-                        @click="onNavClick"
-                    >
-                        <AppIcon
-                            name="faq"
-                            :size="20"
-                            :stroke-width="1.8"
-                            :class="['h-5 w-5 shrink-0', route().current('halaman-publik.faq') ? 'text-emerald-400' : 'text-slate-400']"
-                            decorative
+                        <SidebarNavItem
+                            icon="faq"
+                            label="FAQ Bantuan"
+                            :href="route('halaman-publik.faq')"
+                            :active="route().current('halaman-publik.faq')"
+                            @navigate="onNavClick"
                         />
-                        <span class="ml-2 min-w-0 flex-1 truncate">FAQ Bantuan</span>
-                    </Link>
-                </div>
+                    </div>
+                    <div v-else-if="!collapsed" />
                 </transition>
             </div>
         </div>
@@ -839,7 +505,7 @@ onBeforeUnmount(() => {
         <!-- Padding horizontal disamakan dengan area menu (px-2 rail / px-3 lebar)
              agar kolom kiri profil, avatar, dan Keluar sejajar dengan ikon menu. -->
         <div
-            class="flex shrink-0 flex-col gap-3 border-t border-white/10 py-3"
+            class="flex shrink-0 flex-col gap-3 border-t border-white/10 pb-[calc(1.5rem+env(safe-area-inset-bottom))] pt-3"
             :class="collapsed ? 'px-2' : 'px-3'"
         >
             <!-- Profil + Logout -->
@@ -858,7 +524,7 @@ onBeforeUnmount(() => {
                     <button
                         v-if="avatarSrc"
                         type="button"
-                        class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 transition-colors hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                        class="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/10 transition-all duration-200 ease-out hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                         :aria-label="`Perbesar avatar ${userName}`"
                         @click="openLightbox(avatarSrc, userName)"
                     >
@@ -889,7 +555,7 @@ onBeforeUnmount(() => {
 
                     <Link
                         :href="route('profile.edit')"
-                        class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-brand-blue/40"
+                        class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200 ease-out hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                         :class="route().current('profile.*') ? 'text-emerald-400' : 'text-slate-400'"
                         :aria-label="collapsed ? 'Profil & pengaturan' : undefined"
                         @mouseenter="showTip($event, 'Profil & pengaturan')"
@@ -918,7 +584,7 @@ onBeforeUnmount(() => {
                     :href="route('logout')"
                     method="post"
                     as="button"
-                    class="mt-1.5 flex w-full items-center rounded-lg py-1.5 text-xs text-slate-400 transition-colors hover:bg-white/5 hover:text-rose-300 focus:outline-none focus:ring-2 focus:ring-brand-blue/30"
+                    class="mt-1.5 flex w-full items-center rounded-lg py-2 text-xs text-slate-400 transition-all duration-200 ease-out hover:bg-white/5 hover:text-rose-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50 active:scale-[0.98]"
                     :class="collapsed ? 'justify-center px-2' : 'gap-2.5 px-3'"
                     :aria-label="collapsed ? 'Keluar' : undefined"
                     @mouseenter="showTip($event, 'Keluar')"
@@ -941,7 +607,6 @@ onBeforeUnmount(() => {
                 </Link>
             </div>
         </div>
-        </template>
 
         <!-- Tooltip bersama: dipindah ke <body> agar lolos dari overflow rail dan dari
              `transform` drawer mobile (containing block position:fixed). Hanya ter-render
@@ -964,3 +629,25 @@ onBeforeUnmount(() => {
         />
     </aside>
 </template>
+
+<style scoped>
+/* Area menu: ganti scrollbar tersembunyi dengan scrollbar tipis bertema gelap
+   agar masih terlihat & konsisten di semua browser. */
+.sidebar-menu-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.35) transparent;
+}
+.sidebar-menu-scroll::-webkit-scrollbar {
+    width: 8px;
+}
+.sidebar-menu-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+.sidebar-menu-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.35);
+    border-radius: 9999px;
+}
+.sidebar-menu-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(148, 163, 184, 0.55);
+}
+</style>

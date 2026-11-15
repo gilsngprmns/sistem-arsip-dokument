@@ -61,7 +61,7 @@ class AuthActivityLogTest extends TestCase
     public function test_staff_arsip_store_creates_activity_log_visible_to_admin(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::create(['nama_seksi' => 'Seksi Test']);
+        $seksi = Seksi::create(['kode_seksi' => 'STT', 'nama_seksi' => 'Seksi Test']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
 
         $this->actingAs($staf)->post('/arsip', [
@@ -89,7 +89,7 @@ class AuthActivityLogTest extends TestCase
     public function test_staff_arsip_destroy_creates_activity_log_visible_to_admin(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::create(['nama_seksi' => 'Seksi Test']);
+        $seksi = Seksi::create(['kode_seksi' => 'STT', 'nama_seksi' => 'Seksi Test']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
         $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-DEL', 'nama_rak' => 'Rak Del', 'is_active' => true]);
         $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-DEL', 'is_active' => true]);
@@ -105,7 +105,7 @@ class AuthActivityLogTest extends TestCase
             'boks_id'       => $boks->id,
         ]);
 
-        $arsip = DokumenArsip::where('kode_arsip', 'STF-DEL-001')->first();
+        $arsip = DokumenArsip::where('perihal', 'Dokumen Hapus')->first();
         $this->actingAs($staf)->delete("/arsip/{$arsip->id}");
 
         $this->assertDatabaseHas('activity_logs', [
@@ -134,7 +134,7 @@ class AuthActivityLogTest extends TestCase
 
     public function test_staff_arsip_store_via_inertia_header_creates_activity_log(): void
     {
-        $seksi = Seksi::create(['nama_seksi' => 'Seksi Test']);
+        $seksi = Seksi::create(['kode_seksi' => 'STT', 'nama_seksi' => 'Seksi Test']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
 
         $this->actingAs($staf)
@@ -156,7 +156,7 @@ class AuthActivityLogTest extends TestCase
 
     public function test_staff_arsip_update_via_inertia_header_creates_activity_log(): void
     {
-        $seksi = Seksi::create(['nama_seksi' => 'Seksi Test']);
+        $seksi = Seksi::create(['kode_seksi' => 'STT', 'nama_seksi' => 'Seksi Test']);
         $staf  = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
         $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-UPD', 'nama_rak' => 'Rak Upd', 'is_active' => true]);
         $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-UPD', 'is_active' => true]);
@@ -172,7 +172,7 @@ class AuthActivityLogTest extends TestCase
             'boks_id'       => $boks->id,
         ]);
 
-        $arsip = DokumenArsip::where('kode_arsip', 'STF-UPD-001')->first();
+        $arsip = DokumenArsip::where('perihal', 'Dokumen Update Inertia')->first();
 
         $this->actingAs($staf)
             ->withHeaders(['X-Inertia' => 'true'])
@@ -657,13 +657,16 @@ class AuthActivityLogTest extends TestCase
         // Ketiga baris — termasuk send & verify — harus muncul di halaman
         // /activity-log (bukan tersembunyi oleh filter route), dan opsi
         // send/verify ikut terdaftar di daftar penyaring "aksi".
+        // Halaman /activity-log memakai orderByDesc(created_at) + orderByDesc(id)
+        // (tiebreaker stabil untuk log yang dibuat dalam detiknya yang sama),
+        // jadi baris terbaru (finish) tampil di indeks 0.
         $admin = User::factory()->create(['role' => 'admin']);
         $this->actingAs($admin)->get('/activity-log')->assertOk()
             ->assertInertia(function ($page) {
                 $page->component('Activity/Index');
-                $page->where('activities.data.0.action', 'password.otp.send');
+                $page->where('activities.data.0.action', 'password.otp.finish');
                 $page->where('activities.data.1.action', 'password.otp.verify');
-                $page->where('activities.data.2.action', 'password.otp.finish');
+                $page->where('activities.data.2.action', 'password.otp.send');
                 $page->where('actions', function ($actions) {
                     return collect($actions)->contains('password.otp.send')
                         && collect($actions)->contains('password.otp.verify')

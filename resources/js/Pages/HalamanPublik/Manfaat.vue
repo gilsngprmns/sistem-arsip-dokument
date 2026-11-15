@@ -1,4 +1,5 @@
 <script setup>
+import AppSelect from '@/Components/AppSelect.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
 import Modal from '@/Components/Modal.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
@@ -183,12 +184,15 @@ const modalErrors = computed(() => (showEditManfaat.value ? errors.value : {}));
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-slate-700">Ikon</label>
-                        <select v-model="manfaatForm.ikon"
-                            class="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-                            <option v-for="ikon in props.ikonManfaat" :key="ikon" :value="ikon">
-                                {{ ikonLabel(ikon) }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="manfaatForm.ikon"
+                            class="mt-1 block w-full"
+                            label="Ikon kartu manfaat"
+                            :options="props.ikonManfaat.map((ikon) => ({
+                                value: ikon,
+                                label: ikonLabel(ikon),
+                            }))"
+                        />
                     </div>
                 </div>
                 <div class="mt-4">
@@ -248,12 +252,15 @@ const modalErrors = computed(() => (showEditManfaat.value ? errors.value : {}));
                     </div>
                     <div>
                         <label class="mb-1 block text-sm font-medium text-slate-700">Ikon</label>
-                        <select v-model="manfaatEditForm.ikon"
-                            class="mt-1 block w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-                            <option v-for="ikon in props.ikonManfaat" :key="ikon" :value="ikon">
-                                {{ ikonLabel(ikon) }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="manfaatEditForm.ikon"
+                            class="mt-1 block w-full"
+                            label="Ikon kartu manfaat"
+                            :options="props.ikonManfaat.map((ikon) => ({
+                                value: ikon,
+                                label: ikonLabel(ikon),
+                            }))"
+                        />
                     </div>
                 </div>
                 <div class="mt-4">

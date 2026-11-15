@@ -103,6 +103,14 @@ const pihak = (row) => {
 
     return row.tujuan_instansi || '—';
 };
+
+// Tahap 5: file terenkripsi → endpoint terkontrol; publik → /storage/
+const fileUrl = (row) => {
+    if (!row.file_path) return null;
+    return row.is_encrypted
+        ? route('arsip.file', row.id)
+        : `/storage/${row.file_path}`;
+};
 </script>
 
 <template>
@@ -123,8 +131,9 @@ const pihak = (row) => {
                 <li
                     v-for="row in rows"
                     :key="`card-${row.id}`"
-                    class="flex items-start gap-3 px-4 py-4"
+                    class="px-4 py-4"
                 >
+                    <div class="flex items-start gap-3">
                     <input
                         type="checkbox"
                         :value="String(row.id)"
@@ -150,8 +159,9 @@ const pihak = (row) => {
                         <div class="mt-1 text-sm font-semibold text-slate-800">{{ row.nomor_surat }}</div>
                         <p class="mt-2 line-clamp-2 text-sm text-slate-600">{{ row.perihal }}</p>
                     </button>
+                    </div>
 
-                    <div class="mt-3 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                    <div class="mt-2 ml-7 flex flex-wrap items-center gap-2 text-xs text-slate-500 sm:ml-7">
                         <span
                             class="inline-flex rounded-md px-2 py-0.5 text-[11px] font-bold"
                             :class="seksiBadge(row.seksi?.nama_seksi).class"
@@ -165,19 +175,19 @@ const pihak = (row) => {
                         <span class="min-w-0 truncate">{{ pihak(row) }}</span>
                     </div>
 
-                    <div class="mt-2">
+                    <div class="mt-1.5 ml-7">
                         <a
                             v-if="row.file_path"
-                            :href="`/storage/${row.file_path}`"
+                            :href="fileUrl(row)"
                             target="_blank"
                             class="text-xs font-semibold text-brand-blue hover:underline"
                         >
-                            Lihat Lampiran
+                            {{ row.is_encrypted ? 'Unduh PDF' : 'Lihat Lampiran' }}
                         </a>
                         <span v-else class="text-xs text-slate-400">Tidak ada lampiran</span>
                     </div>
 
-                    <div class="mt-3 border-t border-slate-100 pt-3">
+                    <div class="mt-3 ml-7 border-t border-slate-100 pt-3">
                         <ActionButtons
                             :arsip="row"
                             :show-view="false"
@@ -265,11 +275,11 @@ const pihak = (row) => {
                         <td class="w-[100px] px-4 py-3 align-top">
                             <a
                                 v-if="row.file_path"
-                                :href="`/storage/${row.file_path}`"
+                                :href="fileUrl(row)"
                                 target="_blank"
                                 class="text-xs font-semibold text-brand-blue hover:underline"
                             >
-                                Lihat Lampiran
+                                {{ row.is_encrypted ? 'Unduh PDF' : 'Lihat Lampiran' }}
                             </a>
                             <span v-else class="text-xs text-slate-400">Tidak ada</span>
                         </td>

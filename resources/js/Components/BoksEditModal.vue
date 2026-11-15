@@ -1,6 +1,7 @@
 <script setup>
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -115,17 +116,18 @@ const truncateOption = (text, maxChars = 30) => {
         <form class="space-y-4 px-6 py-5" @submit.prevent="submit">
             <div>
                 <InputLabel for="edit_rak_id" value="Rak *" />
-                <select
+                <AppSelect
                     id="edit_rak_id"
                     v-model="form.rak_id"
-                    class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
+                    class="mt-1 block w-full"
+                    placeholder="Pilih rak"
+                    label="Rak boks"
                     required
-                >
-                    <option value="" disabled>Pilih rak</option>
-                    <option v-for="rak in rakList" :key="rak.id" :value="rak.id">
-                        {{ truncateOption(rak.kode_rak + ' — ' + (rak.nama_rak ?? '')) }}
-                    </option>
-                </select>
+                    :options="rakList.map((rak) => ({
+                        value: rak.id,
+                        label: truncateOption(rak.kode_rak + ' — ' + (rak.nama_rak ?? '')),
+                    }))"
+                />
                 <InputError class="mt-1" :message="errors.rak_id" />
             </div>
 

@@ -32,7 +32,8 @@ class ActivityLogController extends Controller
                     'verification.send',
                 ])
                 ->filterByRequest($request)
-                ->latest()
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
                 ->paginate(25)
                 ->withQueryString(),
             'filters' => $filters,
@@ -74,7 +75,11 @@ class ActivityLogController extends Controller
                 $query->where('id', '>', $sinceId);
             }
 
-            return $query->latest()->limit($limit)->get([
+            return $query
+                ->orderByDesc('created_at')
+                ->orderByDesc('id')
+                ->limit($limit)
+                ->get([
                     'id',
                     'user_id',
                     'action',

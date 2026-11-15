@@ -1,5 +1,6 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import { useActivityLogLive } from '@/composables/useActivityLogLive';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { computed, onMounted, ref, watch } from 'vue';
@@ -351,7 +352,6 @@ const excelUrl = computed(() => {
 
 // Kelas kontrol filter — disamakan dengan pola halaman Users/Index.vue
 const inputClass = 'rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700';
-const filterSelectClass = 'min-w-[9.5rem] rounded-xl border border-slate-300 py-2 pl-3 pr-10 text-sm text-slate-700';
 const buttonClass = 'rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50';
 const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50';
 </script>
@@ -435,15 +435,39 @@ const shortcutClass = 'rounded-xl border border-slate-200 px-3 py-1.5 text-xs fo
                 <button type="button" :class="shortcutClass" @click="applyShortcut(7)">7 hari</button>
                 <button type="button" :class="shortcutClass" @click="applyShortcut(30)">30 hari</button>
             </div>
-            <select v-model="localFilters.pengguna" :class="filterSelectClass" @change="applyFilters">
-                <option value="">Semua pengguna</option>
-                <option value="sistem">Sistem</option>
-                <option v-for="u in users" :key="u.id" :value="String(u.id)">{{ u.name }}</option>
-            </select>
-            <select v-model="localFilters.aksi" :class="filterSelectClass" @change="applyFilters">
-                <option value="">Semua aksi</option>
-                <option v-for="a in actions" :key="a" :value="a">{{ actionOptionLabel(a) }}</option>
-            </select>
+            <div style="min-width: 9.5rem">
+                <AppSelect
+                    v-model="localFilters.pengguna"
+                    size="sm"
+                    placeholder="Semua pengguna"
+                    label="Filter pengguna aktivitas"
+                    :options="[
+                        { value: '', label: 'Semua pengguna' },
+                        { value: 'sistem', label: 'Sistem' },
+                        ...users.map((u) => ({
+                            value: String(u.id),
+                            label: u.name,
+                        })),
+                    ]"
+                    @change="applyFilters"
+                />
+            </div>
+            <div style="min-width: 9.5rem">
+                <AppSelect
+                    v-model="localFilters.aksi"
+                    size="sm"
+                    placeholder="Semua aksi"
+                    label="Filter aksi aktivitas"
+                    :options="[
+                        { value: '', label: 'Semua aksi' },
+                        ...actions.map((a) => ({
+                            value: a,
+                            label: actionOptionLabel(a),
+                        })),
+                    ]"
+                    @change="applyFilters"
+                />
+            </div>
             <input
                 v-model="localFilters.q"
                 type="search"

@@ -1,9 +1,10 @@
 <script setup>
 import SirkulasiModal from '@/Components/SirkulasiModal.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
 import { useStafOnline } from '@/composables/useStafOnline';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, ref } from 'vue';
 
 const props = defineProps({
     stats: {
@@ -42,6 +43,10 @@ const props = defineProps({
             metadata_kosong: 0,
             tanpa_qr: 0,
         }),
+    },
+    retensi: {
+        type: Object,
+        default: () => ({ kedaluwarsa: 0, akan_kedaluwarsa: 0 }),
     },
 });
 
@@ -101,29 +106,8 @@ const navigateTrend = () => {
 };
 
 /* ============ Skeleton loading ============ */
-const SKELETON_MS = 1000;
-const isLoading = ref(true);
-let skeletonTimer = null;
-
-const armSkeleton = () => {
-    if (skeletonTimer) clearTimeout(skeletonTimer);
-    skeletonTimer = setTimeout(() => { isLoading.value = false; skeletonTimer = null; }, SKELETON_MS);
-};
-
-onMounted(armSkeleton);
-
-watch(
-    () => page.url,
-    () => {
-        if (isLoading.value) return;
-        isLoading.value = true;
-        armSkeleton();
-    }
-);
-
-onBeforeUnmount(() => {
-    if (skeletonTimer) clearTimeout(skeletonTimer);
-});
+// Skeleton dipicu oleh AppLayout (state global isLoading, 1000ms).
+// Dashboard hanya menyediakan slot #skeleton untuk konten presisi layout.
 
 const overdueLoanCount = computed(() =>
     props.activeLoans.filter((loan) => loan.terlambat).length
@@ -165,6 +149,32 @@ const alerts = computed(() => {
     const metadata = props.dataHealth.metadata_kosong || 0;
     const tanpaFile = props.dataHealth.tanpa_file || 0;
     const tanpaQr = props.dataHealth.tanpa_qr || 0;
+    const retKedaluwarsa = props.retensi?.kedaluwarsa || 0;
+    const retAkanKedaluwarsa = props.retensi?.akan_kedaluwarsa || 0;
+
+    if (retKedaluwarsa > 0) {
+        items.push({
+            key: 'retensi_kedaluwarsa',
+            label: 'Retensi Kedaluwarsa',
+            value: retKedaluwarsa,
+            hint: 'Dokumen telah melewati masa retensi — pertimbangkan tindakan',
+            tone: 'border-rose-200 bg-rose-50 text-rose-800',
+            valueTone: 'text-rose-700',
+            link: route('arsip.index', { status_retensi: 'kedaluwarsa' }),
+        });
+    }
+
+    if (retAkanKedaluwarsa > 0) {
+        items.push({
+            key: 'retensi_akan_kedaluwarsa',
+            label: 'Retensi Akan Berakhir',
+            value: retAkanKedaluwarsa,
+            hint: 'Akan kedaluwarsa dalam 30 hari ke depan',
+            tone: 'border-amber-200 bg-amber-50 text-amber-800',
+            valueTone: 'text-amber-700',
+            link: route('arsip.index', { status_retensi: 'akan_kedaluwarsa' }),
+        });
+    }
 
     if (terlambat > 0) {
         items.push({
@@ -371,12 +381,12 @@ const closeSirkulasi = () => {
 
     <AppLayout>
         <template #header>
-            <div v-if="!isLoading" class="flex items-center justify-between gap-4">
+            <div class="flex items-center justify-between gap-4">
                 <div class="min-w-0">
                     <h1 class="text-xl font-bold text-brand-navy sm:text-2xl">Dashboard</h1>
                     <p class="mt-1 text-sm text-slate-500">Command center operasional pengarsipan.</p>
                 </div>
-                <div class="flex shrink-0 items-center gap-3">
+                <div class="flex shrink-0 flex-col items-end gap-2 sm:flex-row sm:items-center sm:gap-3">
                     <Link
                         :href="route('arsip.index')"
                         class="inline-flex shrink rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
@@ -391,19 +401,20 @@ const closeSirkulasi = () => {
                     </span>
                 </div>
             </div>
-            <div v-else class="motion-safe:animate-pulse space-y-3">
-                <div class="flex items-center justify-between gap-4">
-                    <div class="h-8 w-48 rounded-2xl bg-slate-200" />
-                    <div class="flex items-center gap-3">
-                        <div class="h-9 w-32 rounded-2xl bg-slate-200" />
-                        <div class="h-5 w-16 rounded-full bg-slate-200" />
-                    </div>
+        </template>
+
+        <template #skeleton-header>
+            <div class="flex items-center justify-between gap-4">
+                <div class="h-8 w-48 rounded-2xl bg-slate-200" />
+                <div class="flex items-center gap-3">
+                    <div class="h-9 w-32 rounded-2xl bg-slate-200" />
+                    <div class="h-5 w-16 rounded-full bg-slate-200" />
                 </div>
             </div>
         </template>
 
-        <!-- =============== SKELETON LOADING =============== -->
-        <div v-if="isLoading" role="status" aria-live="polite" class="grid motion-safe:animate-pulse grid-cols-1 gap-5 lg:grid-cols-12">
+        <template #skeleton>
+        <div role="status" aria-live="polite" class="grid motion-safe:animate-pulse grid-cols-1 gap-5 lg:grid-cols-12">
             <span class="sr-only">Memuat dashboard…</span>
             <!-- Kolom kiri skeleton -->
             <div class="space-y-5 lg:col-span-8">
@@ -471,15 +482,16 @@ const closeSirkulasi = () => {
                 </div>
                 <div class="rounded-2xl bg-slate-200 p-5">
                     <div class="h-4 w-40 rounded bg-slate-100" />
-                    <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
                         <div v-for="i in 5" :key="'stat-' + i" class="h-16 rounded-2xl bg-slate-100" />
                     </div>
                 </div>
             </div>
         </div>
+        </template>
 
         <!-- =============== DASHBOARD ORIGINAL =============== -->
-        <div v-else class="grid grid-cols-1 gap-5 lg:grid-cols-12">
+        <div class="grid grid-cols-1 gap-5 lg:grid-cols-12">
             <!-- =============== LEFT COLUMN (lg:col-span-8) =============== -->
             <div class="space-y-5 lg:col-span-8">
                 <!-- Baris 1: KPI 4 kolom -->
@@ -528,24 +540,30 @@ const closeSirkulasi = () => {
                                     </span>
                                 </div>
                                 <div class="flex shrink-0 items-center gap-1.5">
-                                    <select
-                                        :value="trendUnit"
-                                        class="h-10 min-w-[142px] shrink-0 rounded-lg border border-slate-300 bg-white pl-3 pr-9 text-[13px] font-medium text-slate-700 shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 focus:outline-none"
-                                        @change="changeTrendUnit($event.target.value)"
-                                    >
-                                        <option v-for="opt in Object.entries(TREND_OPTIONS)" :key="opt[0]" :value="opt[0]">
-                                            Per {{ opt[1].label }}
-                                        </option>
-                                    </select>
-                                    <select
-                                        :value="trendCount"
-                                        class="h-10 min-w-[104px] shrink-0 rounded-lg border border-slate-300 bg-white pl-3 pr-9 text-[13px] font-medium text-slate-700 shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 focus:outline-none"
-                                        @change="changeTrendPeriod($event.target.value)"
-                                    >
-                                        <option v-for="val in TREND_OPTIONS[trendUnit].values" :key="val" :value="val">
-                                            {{ val }} {{ TREND_OPTIONS[trendUnit].label.toLowerCase() }}
-                                        </option>
-                                    </select>
+                                    <div class="shrink-0" style="min-width: 142px">
+                                        <AppSelect
+                                            :model-value="trendUnit"
+                                            size="sm"
+                                            label="Periode tren"
+                                            :options="Object.entries(TREND_OPTIONS).map(([key, item]) => ({
+                                                value: key,
+                                                label: `Per ${item.label}`,
+                                            }))"
+                                            :on-change="changeTrendUnit"
+                                        />
+                                    </div>
+                                    <div class="shrink-0" style="min-width: 104px">
+                                        <AppSelect
+                                            :model-value="trendCount"
+                                            size="sm"
+                                            label="Jumlah periode tren"
+                                            :options="TREND_OPTIONS[trendUnit]?.values.map((val) => ({
+                                                value: val,
+                                                label: `${val} ${String(TREND_OPTIONS[trendUnit]?.label ?? '').toLowerCase()}`,
+                                            }))"
+                                            :on-change="changeTrendPeriod"
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -788,20 +806,35 @@ const closeSirkulasi = () => {
                         </span>
                     </div>
                     <div v-if="alerts.length" class="mt-3 space-y-2">
-                        <div
-                            v-for="alert in alerts"
-                            :key="alert.key"
-                            class="flex flex-col gap-1.5 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
-                            :class="alert.tone"
-                        >
-                            <div class="min-w-0 flex-1">
-                                <p class="text-sm font-bold">{{ alert.label }}</p>
-                                <p class="mt-0.5 line-clamp-2 text-xs opacity-80">{{ alert.hint }}</p>
+                        <template v-for="alert in alerts" :key="alert.key">
+                            <Link
+                                v-if="alert.link"
+                                :href="alert.link"
+                                class="flex flex-col gap-1.5 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3 transition hover:shadow-md"
+                                :class="alert.tone"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-bold">{{ alert.label }}</p>
+                                    <p class="mt-0.5 line-clamp-2 text-xs opacity-80">{{ alert.hint }}</p>
+                                </div>
+                                <span class="shrink-0 text-2xl font-bold sm:min-w-[3ch] sm:text-right" :class="alert.valueTone">
+                                    {{ alert.value }}
+                                </span>
+                            </Link>
+                            <div
+                                v-else
+                                class="flex flex-col gap-1.5 rounded-xl border p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-3"
+                                :class="alert.tone"
+                            >
+                                <div class="min-w-0 flex-1">
+                                    <p class="text-sm font-bold">{{ alert.label }}</p>
+                                    <p class="mt-0.5 line-clamp-2 text-xs opacity-80">{{ alert.hint }}</p>
+                                </div>
+                                <span class="shrink-0 text-2xl font-bold sm:min-w-[3ch] sm:text-right" :class="alert.valueTone">
+                                    {{ alert.value }}
+                                </span>
                             </div>
-                            <span class="shrink-0 text-2xl font-bold sm:min-w-[3ch] sm:text-right" :class="alert.valueTone">
-                                {{ alert.value }}
-                            </span>
-                        </div>
+                        </template>
                     </div>
                     <div v-else class="mt-3 rounded-xl bg-emerald-50 p-4 text-center">
                         <p class="text-sm font-semibold text-emerald-800">Semua terkendali.</p>
@@ -992,7 +1025,7 @@ const closeSirkulasi = () => {
                         <h2 class="text-sm font-bold text-brand-navy">Statistik Sistem</h2>
                         <p class="text-xs text-slate-500">Metrik admin yang diperbarui otomatis.</p>
                     </div>
-                    <div class="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
                         <div class="rounded-xl border border-slate-100 bg-white p-3.5 shadow-sm">
                             <p class="text-xs text-slate-500">User aktif</p>
                             <p class="mt-1 text-xl font-bold text-emerald-700">

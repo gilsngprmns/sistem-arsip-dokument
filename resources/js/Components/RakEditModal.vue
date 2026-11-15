@@ -1,6 +1,7 @@
 <script setup>
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import Modal from '@/Components/Modal.vue';
 import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
@@ -143,17 +144,18 @@ const submit = () => {
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div class="min-w-0">
                     <InputLabel for="seksi_id" value="Seksi Pemilik *" />
-                    <select
+                    <AppSelect
                         id="seksi_id"
                         v-model="form.seksi_id"
-                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
+                        class="mt-1 block w-full"
+                        placeholder="Pilih seksi"
+                        label="Seksi pemilik rak"
                         required
-                    >
-                        <option value="">Pilih seksi</option>
-                        <option v-for="seksi in seksiList" :key="seksi.id" :value="seksi.id">
-                            {{ truncateOption(seksi.nama_seksi) }}
-                        </option>
-                    </select>
+                        :options="seksiList.map((seksi) => ({
+                            value: seksi.id,
+                            label: truncateOption(seksi.nama_seksi),
+                        }))"
+                    />
                     <InputError class="mt-1" :message="errors.seksi_id" />
                 </div>
             </div>

@@ -1,9 +1,13 @@
 <script setup>
 import BackLink from '@/Components/BackLink.vue';
+import AppIcon from '@/Components/AppIcon.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import ArsipFormModal from '@/Components/ArsipFormModal.vue';
+import Modal from '@/Components/Modal.vue';
+import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SirkulasiModal from '@/Components/SirkulasiModal.vue';
 import AppLayout from '@/Layouts/AppLayout.vue';
-import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import { Head, router, useForm, usePage } from '@inertiajs/vue3';
 import { computed, onUnmounted, ref, watch } from 'vue';
 
 const props = defineProps({
@@ -84,6 +88,109 @@ const onEditSaved = () => {
 const showSirkulasiModal = ref(false);
 const sirkulasiMode = ref('pinjam');
 const showAllRiwayat = ref(false);
+
+// ── Tahap 4: Pengecekan Dokumen Khusus ──────────────────────
+const isDokumenKhusus = computed(
+    () => ['surat_tanah', 'ahli_waris'].includes(props.arsip.jenis_dokumen ?? ''),
+);
+
+// Tahap 5: file terenkripsi — akses hanya lewat endpoint terkontrol
+const isFileEncrypted = computed(() => Boolean(props.arsip.is_encrypted));
+
+// ── Tahap 6: Badge & panel retensi ──────────────────────────
+const retensiBadge = computed(() => {
+    const a = props.arsip;
+    if (a.retensi_dipertahankan) {
+        return { label: 'Retensi Dipertahankan', cls: 'bg-blue-50 text-blue-800 ring-blue-300' };
+    }
+    if (a.is_kedaluwarsa) {
+        return { label: 'Retensi Kedaluwarsa', cls: 'bg-rose-50 text-rose-800 ring-rose-300' };
+    }
+    if (a.is_akan_kedaluwarsa) {
+        return { label: 'Akan Kedaluwarsa', cls: 'bg-amber-50 text-amber-800 ring-amber-300' };
+    }
+    if (a.retensi_kategori === 'permanen') {
+        return { label: 'Permanen', cls: 'bg-sky-50 text-sky-800 ring-sky-300' };
+    }
+    if (a.retensi_kategori) {
+        const label = a.retensi_kategori === 'kustom'
+            ? `Retensi ${a.retensi_tahun ?? ''} thn`
+            : 'Retensi Ringan';
+        return { label, cls: 'bg-emerald-50 text-emerald-800 ring-emerald-300' };
+    }
+    return null;
+});
+
+const showRetensiModal = ref(false);
+const formRetensi = useForm({ catatan_retensi: '' });
+const submittingRetensi = ref(false);
+
+const openRetensiModal = () => {
+    formRetensi.catatan_retensi = '';
+    formRetensi.clearErrors();
+    showRetensiModal.value = true;
+};
+
+const submitRetensi = () => {
+    submittingRetensi.value = true;
+    formRetensi.post(route('arsip.retensi-tindakan', props.arsip.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showRetensiModal.value = false;
+            formRetensi.reset();
+            router.reload({ only: ['arsip', 'flash'] });
+        },
+        onFinish: () => {
+            submittingRetensi.value = false;
+        },
+    });
+};
+const fileUrl = computed(() => {
+    if (!props.arsip.file_path) return null;
+    return isFileEncrypted.value
+        ? route('arsip.file', props.arsip.id)
+        : `/storage/${props.arsip.file_path}`;
+});
+
+const statusPengecekanBadge = computed(() => {
+    const map = {
+        belum_dicek:      { label: 'Belum Dicek',    cls: 'bg-slate-100 text-slate-700 ring-slate-300' },
+        dalam_pengecekan: { label: 'Dalam Pengecekan', cls: 'bg-sky-50 text-sky-800 ring-sky-300' },
+        terverifikasi:    { label: 'Terverifikasi',   cls: 'bg-emerald-50 text-emerald-800 ring-emerald-300' },
+        perlu_perbaikan:  { label: 'Perlu Perbaikan', cls: 'bg-rose-50 text-rose-800 ring-rose-300' },
+    };
+    return map[props.arsip.status_pengecekan ?? 'belum_dicek'] ?? map.belum_dicek;
+});
+
+const riwayatPengecekan = computed(() => props.arsip.riwayat_pengecekan ?? []);
+const showPengecekanModal = ref(false);
+const formPengecekan = useForm({
+    status_pengecekan: 'dalam_pengecekan',
+    catatan: '',
+});
+const submittingPengecekan = ref(false);
+
+const submitPengecekan = () => {
+    submittingPengecekan.value = true;
+    formPengecekan.post(route('arsip.pengecekan', props.arsip.id), {
+        preserveScroll: true,
+        onSuccess: () => {
+            showPengecekanModal.value = false;
+            formPengecekan.reset();
+            router.reload({ only: ['arsip', 'flash'] });
+        },
+        onFinish: () => {
+            submittingPengecekan.value = false;
+        },
+    });
+};
+
+const openPengecekan = (statusDefault) => {
+    formPengecekan.status_pengecekan = statusDefault;
+    formPengecekan.catatan = '';
+    formPengecekan.clearErrors();
+    showPengecekanModal.value = true;
+};
 
 const RIWAYAT_PREVIEW = 5;
 const MONTHS_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
@@ -286,7 +393,7 @@ const openKembalikan = () => {
                     <div class="space-y-4 p-6">
                         <div v-for="i in 3" :key="'sk-sec-' + i" class="space-y-2">
                             <div class="h-3 w-32 rounded bg-slate-200" />
-                            <div class="grid grid-cols-2 gap-3">
+                            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                 <div class="h-4 w-full rounded bg-slate-200" />
                                 <div class="h-4 w-full rounded bg-slate-200" />
                                 <div class="h-4 w-full rounded bg-slate-200" />
@@ -321,6 +428,38 @@ const openKembalikan = () => {
                         >
                             <span class="h-2 w-2 rounded-full" :class="statusBadge.dot" />
                             {{ statusBadge.label }}
+                        </span>
+                        <!-- Tahap 4: Badge klasifikasi dokumen khusus -->
+                        <span
+                            v-if="isDokumenKhusus"
+                            class="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-bold text-violet-800 ring-1 ring-violet-300 sm:text-sm"
+                        >
+                            {{ arsip.jenis_dokumen === 'surat_tanah' ? 'Surat Tanah' : 'Surat Ahli Waris' }}
+                        </span>
+                        <!-- Tahap 4: Badge status pengecekan -->
+                        <span
+                            v-if="isDokumenKhusus"
+                            class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold ring-1 ring-inset sm:text-sm"
+                            :class="statusPengecekanBadge.cls"
+                        >
+                            {{ statusPengecekanBadge.label }}
+                        </span>
+                        <!-- Tahap 5: Badge terenkripsi -->
+                        <span
+                            v-if="isFileEncrypted"
+                            class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700 ring-1 ring-indigo-200"
+                        >
+                            <AppIcon name="shield" :size="12" :stroke-width="2" decorative />
+                            Terenkripsi AES-256
+                        </span>
+                        <!-- Tahap 6: Badge retensi -->
+                        <span
+                            v-if="retensiBadge"
+                            class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset"
+                            :class="retensiBadge.cls"
+                        >
+                            <AppIcon name="clock" :size="12" :stroke-width="2" decorative />
+                            {{ retensiBadge.label }}
                         </span>
                     </div>
                     <p class="mt-1 text-sm text-slate-600">
@@ -379,6 +518,38 @@ const openKembalikan = () => {
                     </dl>
                 </section>
 
+                <!-- Tahap 4: Card Data Profiling / Biografi -->
+                <section v-if="isDokumenKhusus" class="mt-6 border-t border-amber-200/60 pt-5">
+                    <div class="flex items-center gap-2">
+                        <AppIcon name="key" class="h-4 w-4 text-amber-600" decorative />
+                        <h2 class="text-[11px] font-semibold uppercase tracking-[0.12em] text-amber-700">
+                            Data Profiling / Biografi
+                        </h2>
+                    </div>
+                    <dl class="mt-3 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                        <div>
+                            <dt class="text-slate-500">Nama Pemilik / Pewaris</dt>
+                            <dd class="mt-0.5 font-medium text-slate-800">{{ arsip.nama_pemilik || '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-slate-500">NIK</dt>
+                            <dd class="mt-0.5 font-medium text-slate-800">{{ arsip.nik_pemilik || '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-slate-500">Nomor Alas Hak / Surat</dt>
+                            <dd class="mt-0.5 font-medium text-slate-800">{{ arsip.nomor_alas_hak || '—' }}</dd>
+                        </div>
+                        <div>
+                            <dt class="text-slate-500">Alamat / Lokasi Objek</dt>
+                            <dd class="mt-0.5 font-medium text-slate-800">{{ arsip.alamat_objek || '—' }}</dd>
+                        </div>
+                        <div v-if="arsip.keterangan_profiling" class="col-span-full sm:col-span-2">
+                            <dt class="text-slate-500">Keterangan Tambahan</dt>
+                            <dd class="mt-0.5 whitespace-pre-line font-medium text-slate-800">{{ arsip.keterangan_profiling }}</dd>
+                        </div>
+                    </dl>
+                </section>
+
                 <div class="mt-6 flex flex-wrap gap-2 border-t border-slate-100 pt-5">
                     <button
                         type="button"
@@ -404,17 +575,178 @@ const openKembalikan = () => {
                         Kembalikan
                     </button>
                     <a
-                        v-if="arsip.file_path"
-                        :href="`/storage/${arsip.file_path}`"
+                        v-if="fileUrl"
+                        :href="fileUrl"
                         target="_blank"
-                        class="inline-flex rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                     >
-                        Lihat Lampiran
+                        <AppIcon v-if="isFileEncrypted" name="shield" :size="14" :stroke-width="1.8" decorative />
+                        {{ isFileEncrypted ? 'Unduh PDF (Aman)' : 'Lihat Lampiran' }}
+                    </a>
+                    <!-- Tahap 4: Tombol Cetak Lembar Arsip (dokumen khusus only) -->
+                    <a
+                        v-if="isDokumenKhusus"
+                        :href="route('arsip.print', arsip.id)"
+                        target="_blank"
+                        class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+                    >
+                        <AppIcon name="printer" :size="16" :stroke-width="1.8" decorative />
+                        Cetak Lembar Arsip
                     </a>
                 </div>
             </div>
 
-            <div v-reveal :style="{ transitionDelay: '100ms' }" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-4">
+            <div class="space-y-4">
+                <!-- Tahap 6: Panel Peringatan Retensi -->
+                <div
+                    v-if="arsip.is_kedaluwarsa || arsip.is_akan_kedaluwarsa"
+                    v-reveal
+                    class="rounded-2xl p-5 shadow-sm"
+                    :class="arsip.is_kedaluwarsa ? 'border border-rose-200 bg-rose-50/60' : 'border border-amber-200 bg-amber-50/60'"
+                >
+                    <div class="flex items-start gap-3">
+                        <AppIcon
+                            name="alert-triangle"
+                            :size="20"
+                            :stroke-width="1.8"
+                            decorative
+                            :class="arsip.is_kedaluwarsa ? 'text-rose-500' : 'text-amber-500'"
+                        />
+                        <div class="flex-1">
+                            <h3
+                                class="text-sm font-bold"
+                                :class="arsip.is_kedaluwarsa ? 'text-rose-800' : 'text-amber-800'"
+                            >
+                                {{ arsip.is_kedaluwarsa ? 'Masa Aktif Retensi Berakhir' : 'Masa Aktif Retensi Akan Berakhir' }}
+                            </h3>
+                            <p
+                                class="mt-1 text-sm leading-6"
+                                :class="arsip.is_kedaluwarsa ? 'text-rose-700' : 'text-amber-800'"
+                            >
+                                <template v-if="arsip.is_kedaluwarsa">
+                                    Dokumen ini telah melewati tanggal retensi ({{ formatDate(arsip.tanggal_kedaluwarsa) }}).
+                                    Pertimbangkan untuk mengambil tindakan: pertahankan retensi atau arsipkan secara permanen.
+                                </template>
+                                <template v-else>
+                                    Retensi dokumen ini akan berakhir pada <strong>{{ formatDate(arsip.tanggal_kedaluwarsa) }}</strong>.
+                                    Pertimbangkan apakah dokumen ini masih diperlukan secara aktif.
+                                </template>
+                            </p>
+
+                            <div v-if="arsip.retensi_dipertahankan" class="mt-2 flex items-center gap-2 text-xs text-blue-700">
+                                <AppIcon name="check-circle" :size="14" :stroke-width="1.8" decorative />
+                                Retensi telah diperpanjang oleh {{ arsip.retensi_ditindak_oleh }}
+                                <template v-if="arsip.retensi_ditindak_waktu"> ({{ formatDate(arsip.retensi_ditindak_waktu) }})</template>
+                            </div>
+
+                            <div v-if="arsip.catatan_retensi" class="mt-2 rounded-lg bg-white/60 px-3 py-2 text-xs text-slate-600">
+                                Catatan: {{ arsip.catatan_retensi }}
+                            </div>
+
+                            <button
+                                v-if="!arsip.retensi_dipertahankan"
+                                type="button"
+                                class="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"
+                                @click="openRetensiModal"
+                            >
+                                <AppIcon name="clock" :size="16" :stroke-width="1.8" decorative />
+                                Pertahankan Retensi
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tahap 4: Panel Riwayat & Proses Pengecekan -->
+                <div v-if="isDokumenKhusus" v-reveal class="rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+                    <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <AppIcon name="check-circle" class="h-4 w-4 text-amber-600" decorative />
+                            <h3 class="text-sm font-semibold text-amber-900">Riwayat & Proses Pengecekan</h3>
+                        </div>
+                        <button
+                            type="button"
+                            class="rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold text-amber-800 hover:bg-amber-50"
+                            @click="openPengecekan('dalam_pengecekan')"
+                        >
+                            + Tambah Catatan
+                        </button>
+                    </div>
+
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <button
+                            v-for="opt in [
+                                { val: 'dalam_pengecekan', label: 'Mulai Pengecekan' },
+                                { val: 'terverifikasi',    label: 'Terverifikasi' },
+                                { val: 'perlu_perbaikan',  label: 'Perlu Perbaikan' },
+                            ]"
+                            :key="opt.val"
+                            type="button"
+                            class="rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition"
+                            :class="{
+                                'bg-sky-100 text-sky-800 ring-sky-300': opt.val === 'dalam_pengecekan',
+                                'bg-emerald-100 text-emerald-800 ring-emerald-300': opt.val === 'terverifikasi',
+                                'bg-rose-100 text-rose-800 ring-rose-300': opt.val === 'perlu_perbaikan',
+                            }"
+                            @click="openPengecekan(opt.val)"
+                        >
+                            {{ opt.label }}
+                        </button>
+                    </div>
+
+                    <ul v-if="riwayatPengecekan.length" class="mt-4 divide-y divide-amber-200/50">
+                        <li v-for="item in riwayatPengecekan" :key="item.id" class="py-3 text-sm">
+                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                <div class="min-w-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <span
+                                            class="rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset"
+                                            :class="{
+                                                'bg-slate-100 text-slate-700 ring-slate-300': item.status_sebelum === 'belum_dicek',
+                                                'bg-sky-100 text-sky-800 ring-sky-300': item.status_sebelum === 'dalam_pengecekan',
+                                                'bg-emerald-100 text-emerald-800 ring-emerald-300': item.status_sebelum === 'terverifikasi',
+                                                'bg-rose-100 text-rose-800 ring-rose-300': item.status_sebelum === 'perlu_perbaikan',
+                                            }"
+                                        >
+                                            {{ {
+                                                belum_dicek: 'Belum Dicek',
+                                                dalam_pengecekan: 'Dalam Pengecekan',
+                                                terverifikasi: 'Terverifikasi',
+                                                perlu_perbaikan: 'Perlu Perbaikan',
+                                            }[item.status_sebelum] || 'Belum Dicek' }}
+                                        </span>
+                                        <span class="text-xs text-slate-400">→</span>
+                                        <span
+                                            class="rounded-full px-2 py-0.5 text-xs font-bold ring-1 ring-inset"
+                                            :class="{
+                                                'bg-slate-100 text-slate-700 ring-slate-300': item.status_sesudah === 'belum_dicek',
+                                                'bg-sky-100 text-sky-800 ring-sky-300': item.status_sesudah === 'dalam_pengecekan',
+                                                'bg-emerald-100 text-emerald-800 ring-emerald-300': item.status_sesudah === 'terverifikasi',
+                                                'bg-rose-100 text-rose-800 ring-rose-300': item.status_sesudah === 'perlu_perbaikan',
+                                            }"
+                                        >
+                                            {{ {
+                                                belum_dicek: 'Belum Dicek',
+                                                dalam_pengecekan: 'Dalam Pengecekan',
+                                                terverifikasi: 'Terverifikasi',
+                                                perlu_perbaikan: 'Perlu Perbaikan',
+                                            }[item.status_sesudah] || item.status_sesudah }}
+                                        </span>
+                                    </div>
+                                    <p v-if="item.catatan" class="mt-1.5 whitespace-pre-line text-xs text-slate-600">{{ item.catatan }}</p>
+                                    <p class="mt-1 text-xs text-slate-400">oleh {{ item.user?.name || '—' }}</p>
+                                </div>
+                                <time class="shrink-0 text-xs text-slate-500" :title="formatDateTime(item.created_at)">
+                                    {{ formatRelative(item.created_at) }}
+                                </time>
+                            </div>
+                        </li>
+                    </ul>
+                    <p v-else class="mt-3 text-sm leading-6 text-slate-500">
+                        Belum ada catatan pengecekan. Klik "Tambah Catatan" untuk memulai.
+                    </p>
+                </div>
+
+                <div v-reveal :style="{ transitionDelay: '100ms' }" class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm lg:sticky lg:top-4">
                 <div class="flex items-center justify-between gap-3">
                     <h3 class="text-sm font-semibold text-slate-800">Riwayat Sirkulasi</h3>
                     <span v-if="allRiwayat.length" class="text-xs text-slate-400">
@@ -454,6 +786,7 @@ const openKembalikan = () => {
                 >
                     {{ showAllRiwayat ? 'Tampilkan lebih sedikit' : `Lihat semua (${hiddenRiwayatCount} lainnya)` }}
                 </button>
+                </div>
             </div>
         </div>
     </AppLayout>
@@ -475,4 +808,107 @@ const openKembalikan = () => {
         :on-finish="onEditSaved"
         @close="showEditModal = false"
     />
+
+    <!-- Tahap 6: Modal Pertahankan Retensi -->
+    <Modal :show="showRetensiModal" max-width="md" @close="showRetensiModal = false">
+        <form
+            v-if="showRetensiModal"
+            class="p-6"
+            @submit.prevent="submitRetensi"
+        >
+            <div class="flex items-center gap-2">
+                <AppIcon name="clock" :size="18" :stroke-width="1.8" class="text-blue-500" decorative />
+                <h2 class="text-lg font-bold text-slate-900">Pertahankan Retensi</h2>
+            </div>
+            <p class="mt-1 text-sm text-brand-blue">{{ arsip.kode_arsip }}</p>
+            <p class="mt-2 text-sm text-slate-600">
+                Dengan mengambil tindakan ini, dokumen akan ditandai sebagai "Retensi Dipertahankan" dan
+                tidak akan ditampilkan sebagai kedaluwarsa lagi. Tindakan ini tercatat di log aktivitas.
+            </p>
+
+            <div class="mt-4">
+                <label for="retensi_catatan" class="block text-sm font-medium text-slate-700">
+                    Alasan / Catatan (opsional)
+                </label>
+                <textarea
+                    id="retensi_catatan"
+                    v-model="formRetensi.catatan_retensi"
+                    rows="3"
+                    class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500/30"
+                    placeholder="Contoh: Dokumen diperlukan untuk audit 2026, dipertahankan hingga 2027."
+                />
+                <p v-if="formRetensi.errors.catatan_retensi" class="mt-1 text-xs text-rose-600">{{ formRetensi.errors.catatan_retensi }}</p>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button
+                    type="button"
+                    class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    @click="showRetensiModal = false"
+                >
+                    Batal
+                </button>
+                <PrimaryButton class="bg-blue-600" :disabled="submittingRetensi">
+                    {{ submittingRetensi ? 'Menyimpan…' : 'Pertahankan' }}
+                </PrimaryButton>
+            </div>
+        </form>
+    </Modal>
+
+    <!-- Tahap 4: Modal Pengecekan Dokumen Khusus -->
+    <Modal :show="showPengecekanModal" max-width="md" @close="showPengecekanModal = false">
+        <form
+            v-if="isDokumenKhusus"
+            class="p-6"
+            @submit.prevent="submitPengecekan"
+        >
+            <h2 class="text-lg font-bold text-slate-900">Catatan Pengecekan</h2>
+            <p class="mt-1 text-sm text-brand-blue">{{ arsip.kode_arsip }} — {{ arsip.nama_pemilik || arsip.perihal }}</p>
+            <p class="mt-2 text-sm text-slate-600">
+                Pilih status pengecekan dan tambahkan catatan bila diperlukan.
+            </p>
+
+            <div class="mt-4">
+                <label for="pengecekan_status" class="block text-sm font-medium text-slate-700">Status Pengecekan</label>
+                <AppSelect
+                    id="pengecekan_status"
+                    v-model="formPengecekan.status_pengecekan"
+                    class="mt-1 block w-full"
+                    label="Status pengecekan arsip"
+                    :options="[
+                        { value: 'dalam_pengecekan', label: 'Dalam Pengecekan' },
+                        { value: 'terverifikasi', label: 'Terverifikasi' },
+                        { value: 'perlu_perbaikan', label: 'Perlu Perbaikan' },
+                        { value: 'belum_dicek', label: 'Belum Dicek (reset)' },
+                    ]"
+                />
+                <p v-if="formPengecekan.errors.status_pengecekan" class="mt-1 text-xs text-red-600">{{ formPengecekan.errors.status_pengecekan }}</p>
+            </div>
+
+            <div class="mt-4">
+                <label for="pengecekan_catatan" class="block text-sm font-medium text-slate-700">Catatan Pengecekan</label>
+                <textarea
+                    id="pengecekan_catatan"
+                    v-model="formPengecekan.catatan"
+                    rows="3"
+                    class="mt-1 block w-full rounded-xl border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
+                    placeholder="Contoh: Dokumen lengkap, tanda tangan lurah sudah ada, nomor alas hak sesuai sertifikat."
+                />
+                <p v-if="formPengecekan.errors.catatan" class="mt-1 text-xs text-red-600">{{ formPengecekan.errors.catatan }}</p>
+            </div>
+
+            <div class="mt-6 flex justify-end gap-3">
+                <button
+                    type="button"
+                    class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+                    @click="showPengecekanModal = false"
+                >
+                    Batal
+                </button>
+                <PrimaryButton class="bg-brand-blue" :disabled="submittingPengecekan">
+                    {{ submittingPengecekan ? 'Menyimpan…' : 'Simpan Pengecekan' }}
+                </PrimaryButton>
+            </div>
+        </form>
+    </Modal>
 </template>

@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppIcon from '@/Components/AppIcon.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
 import EmptyState from '@/Components/EmptyState.vue';
 import Modal from '@/Components/Modal.vue';
@@ -298,8 +299,6 @@ const resetFilters = () => {
 const roleLabel = (role) => (role === 'admin' ? 'Admin' : 'Staf');
 
 const inputClass = 'w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-700';
-const selectClass = 'w-full rounded-xl border border-slate-300 py-2 pl-3 pr-10 text-sm text-slate-700';
-const filterSelectClass = 'min-w-[9.5rem] rounded-xl border border-slate-300 py-2 pl-3 pr-10 text-sm text-slate-700';
 const sectionTitle = 'text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400';
 const eyeBtnClass = 'absolute inset-y-0 right-0 flex items-center px-3 text-slate-400 hover:text-slate-700';
 </script>
@@ -422,25 +421,34 @@ const eyeBtnClass = 'absolute inset-y-0 right-0 flex items-center px-3 text-slat
                     <div class="mt-2 grid items-start gap-3 md:grid-cols-2 xl:grid-cols-3">
                         <div>
                             <label class="mb-1 block text-sm font-medium text-slate-700">Role</label>
-                            <select v-model="createForm.role" :class="selectClass" @change="onCreateRoleChange">
-                                <option value="staf">Staf</option>
-                                <option value="admin">Admin</option>
-                            </select>
+                            <AppSelect
+                                v-model="createForm.role"
+                                label="Role pengguna"
+                                :options="[
+                                    { value: 'staf', label: 'Staf' },
+                                    { value: 'admin', label: 'Admin' },
+                                ]"
+                                :on-change="onCreateRoleChange"
+                            />
                         </div>
                         <div>
                             <label class="mb-1 block text-sm font-medium text-slate-700">
                                 Seksi
                                 <span v-if="createForm.role === 'staf'" class="text-rose-600">*</span>
                             </label>
-                            <select
+                            <AppSelect
                                 v-model="createForm.seksi_id"
-                                :class="selectClass"
+                                :placeholder="createForm.role === 'admin' ? 'Tanpa seksi' : 'Pilih seksi'"
+                                label="Seksi pengguna"
                                 :required="createForm.role === 'staf'"
-                            >
-                                <option v-if="createForm.role === 'admin'" value="">Tanpa seksi</option>
-                                <option v-if="createForm.role === 'staf'" disabled value="">Pilih seksi</option>
-                                <option v-for="seksi in props.seksiList" :key="seksi.id" :value="seksi.id">{{ seksi.nama_seksi }}</option>
-                            </select>
+                                :options="[
+                                    ...(createForm.role === 'admin' ? [{ value: '', label: 'Tanpa seksi' }] : []),
+                                    ...props.seksiList.map((seksi) => ({
+                                        value: seksi.id,
+                                        label: seksi.nama_seksi,
+                                    })),
+                                ]"
+                            />
                             <p v-if="createForm.role === 'staf'" class="mt-0.5 text-xs text-slate-500">Wajib untuk role Staf.</p>
                         </div>
                         <div>
@@ -480,21 +488,51 @@ const eyeBtnClass = 'absolute inset-y-0 right-0 flex items-center px-3 text-slat
                 class="rounded-xl border border-slate-300 px-3 py-2 text-sm md:min-w-[12rem] md:flex-1"
                 @keyup.enter="applyFilters"
             >
-            <select v-model="filters.role" :class="filterSelectClass" @change="applyFilters">
-                <option value="">Semua role</option>
-                <option value="admin">Admin</option>
-                <option value="staf">Staf</option>
-            </select>
-            <select v-model="filters.seksi_id" :class="`${filterSelectClass} min-w-[10.5rem]`" @change="applyFilters">
-                <option value="">Semua seksi</option>
-                <option value="none">Tanpa seksi</option>
-                <option v-for="seksi in props.seksiList" :key="seksi.id" :value="String(seksi.id)">{{ seksi.nama_seksi }}</option>
-            </select>
-            <select v-model="filters.status" :class="`${filterSelectClass} min-w-[10rem]`" @change="applyFilters">
-                <option value="">Semua status</option>
-                <option value="aktif">Aktif</option>
-                <option value="nonaktif">Nonaktif</option>
-            </select>
+            <div style="min-width: 9.5rem">
+                <AppSelect
+                    v-model="filters.role"
+                    size="sm"
+                    placeholder="Semua role"
+                    label="Filter role pengguna"
+                    :options="[
+                        { value: '', label: 'Semua role' },
+                        { value: 'admin', label: 'Admin' },
+                        { value: 'staf', label: 'Staf' },
+                    ]"
+                    @change="applyFilters"
+                />
+            </div>
+            <div style="min-width: 10.5rem">
+                <AppSelect
+                    v-model="filters.seksi_id"
+                    size="sm"
+                    placeholder="Semua seksi"
+                    label="Filter seksi pengguna"
+                    :options="[
+                        { value: '', label: 'Semua seksi' },
+                        { value: 'none', label: 'Tanpa seksi' },
+                        ...props.seksiList.map((seksi) => ({
+                            value: String(seksi.id),
+                            label: seksi.nama_seksi,
+                        })),
+                    ]"
+                    @change="applyFilters"
+                />
+            </div>
+            <div style="min-width: 10rem">
+                <AppSelect
+                    v-model="filters.status"
+                    size="sm"
+                    placeholder="Semua status"
+                    label="Filter status pengguna"
+                    :options="[
+                        { value: '', label: 'Semua status' },
+                        { value: 'aktif', label: 'Aktif' },
+                        { value: 'nonaktif', label: 'Nonaktif' },
+                    ]"
+                    @change="applyFilters"
+                />
+            </div>
             <button
                 type="button"
                 class="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
@@ -744,25 +782,34 @@ const eyeBtnClass = 'absolute inset-y-0 right-0 flex items-center px-3 text-slat
                         <div class="mt-3 grid items-start gap-4 sm:grid-cols-2">
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-slate-700">Role</label>
-                                <select v-model="editForm.role" :class="selectClass" @change="onEditRoleChange">
-                                    <option value="staf">Staf</option>
-                                    <option value="admin">Admin</option>
-                                </select>
+                                <AppSelect
+                                    v-model="editForm.role"
+                                    label="Role pengguna"
+                                    :options="[
+                                        { value: 'staf', label: 'Staf' },
+                                        { value: 'admin', label: 'Admin' },
+                                    ]"
+                                    :on-change="onEditRoleChange"
+                                />
                             </div>
                             <div>
                                 <label class="mb-1 block text-sm font-medium text-slate-700">
                                     Seksi
                                     <span v-if="editForm.role === 'staf'" class="text-rose-600">*</span>
                                 </label>
-                                <select
+                                <AppSelect
                                     v-model="editForm.seksi_id"
-                                    :class="selectClass"
+                                    :placeholder="editForm.role === 'admin' ? 'Tanpa seksi' : 'Pilih seksi'"
+                                    label="Seksi pengguna"
                                     :required="editForm.role === 'staf'"
-                                >
-                                    <option v-if="editForm.role === 'admin'" value="">Tanpa seksi</option>
-                                    <option v-if="editForm.role === 'staf'" disabled value="">Pilih seksi</option>
-                                    <option v-for="seksi in props.seksiList" :key="seksi.id" :value="seksi.id">{{ seksi.nama_seksi }}</option>
-                                </select>
+                                    :options="[
+                                        ...(editForm.role === 'admin' ? [{ value: '', label: 'Tanpa seksi' }] : []),
+                                        ...props.seksiList.map((seksi) => ({
+                                            value: seksi.id,
+                                            label: seksi.nama_seksi,
+                                        })),
+                                    ]"
+                                />
                             </div>
                             <div class="sm:col-span-2">
                                 <label class="mb-1 block text-sm font-medium text-slate-700">Status</label>

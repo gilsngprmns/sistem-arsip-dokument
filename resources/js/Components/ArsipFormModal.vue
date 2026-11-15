@@ -1,4 +1,6 @@
 <script setup>
+import AppIcon from '@/Components/AppIcon.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import InputError from '@/Components/InputError.vue';
 import InputLabel from '@/Components/InputLabel.vue';
 import Modal from '@/Components/Modal.vue';
@@ -6,7 +8,7 @@ import PrimaryButton from '@/Components/PrimaryButton.vue';
 import SecondaryButton from '@/Components/SecondaryButton.vue';
 import TextInput from '@/Components/TextInput.vue';
 import { useForm, usePage } from '@inertiajs/vue3';
-import { computed, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 const props = defineProps({
     show: {
@@ -74,6 +76,12 @@ const emptyForm = () => ({
     boks_id: '',
     catatan: '',
     lampiran: null,
+    jenis_dokumen: 'umum',
+    nama_pemilik: '',
+    nik_pemilik: '',
+    alamat_objek: '',
+    nomor_alas_hak: '',
+    keterangan_profiling: '',
 });
 
 const form = useForm(emptyForm());
@@ -82,6 +90,19 @@ const filteredBoksList = computed(() => {
     if (!form.rak_id) return [];
     return (props.boksList ?? []).filter((boks) => Number(boks.rak_id) === Number(form.rak_id));
 });
+
+// Tahap 4 — Klasifikasi Dokumen
+const isSeksiPemerintahan = computed(() => {
+    const seksi = resolvedSeksiList.value.find((s) => String(s.id) === String(form.seksi_id));
+    if (!seksi) return false;
+    const kode = seksi.kode_seksi ?? '';
+    const nama = seksi.nama_seksi ?? '';
+    return kode === 'PEM' || nama.toLowerCase().includes('pemerintahan');
+});
+
+const isDokumenKhusus = computed(() => form.jenis_dokumen === 'surat_tanah' || form.jenis_dokumen === 'ahli_waris');
+
+const acceptLampiran = computed(() => isDokumenKhusus.value ? '.pdf' : '.pdf,.jpg,.jpeg,.png,application/pdf,image/*');
 const selectedFileName = computed(() => {
     if (form.lampiran && typeof form.lampiran === 'object' && form.lampiran.name) {
         return form.lampiran.name;
@@ -90,7 +111,9 @@ const selectedFileName = computed(() => {
 });
 const existingFileUrl = computed(() => {
     if (props.mode === 'edit' && props.initialData?.file_path) {
-        return `/storage/${props.initialData.file_path}`;
+        return props.initialData.is_encrypted
+            ? route('arsip.file', props.initialData.id)
+            : `/storage/${props.initialData.file_path}`;
     }
     return null;
 });
@@ -128,6 +151,12 @@ const fillForm = () => {
                   boks_id: props.initialData.boks_id ?? '',
                   catatan: props.initialData.catatan ?? '',
                   lampiran: null,
+                  jenis_dokumen: props.initialData.jenis_dokumen ?? 'umum',
+                  nama_pemilik: props.initialData.nama_pemilik ?? '',
+                  nik_pemilik: props.initialData.nik_pemilik ?? '',
+                  alamat_objek: props.initialData.alamat_objek ?? '',
+                  nomor_alas_hak: props.initialData.nomor_alas_hak ?? '',
+                  keterangan_profiling: props.initialData.keterangan_profiling ?? '',
               }
             : emptyForm();
 
@@ -144,14 +173,57 @@ watch(
     },
 );
 
+const previewKodeArsip = ref('');
+
+const fetchPreview = async (seksiId) => {
+    if (!seksiId || props.mode === 'edit') {
+        previewKodeArsip.value = '';
+        return;
+    }
+    try {
+        const res = await fetch(route('arsip.next-number', { seksi_id: seksiId }), {
+            headers: { 'X-Requested-With': 'XMLHttpRequest', Accept: 'application/json' },
+            credentials: 'same-origin',
+        });
+        if (res.ok) {
+            const data = await res.json();
+            previewKodeArsip.value = data.kode_arsip ?? '';
+        } else {
+            previewKodeArsip.value = '';
+        }
+    } catch {
+        previewKodeArsip.value = '';
+    }
+};
+
 watch(
     () => form.seksi_id,
-    () => {
+    (seksiId) => {
+        if (props.mode === 'create') {
+            fetchPreview(seksiId);
+        }
         if (!form.rak_id) return;
         const stillValid = filteredRakList.value.some((rak) => Number(rak.id) === Number(form.rak_id));
         if (!stillValid) {
             form.rak_id = '';
             form.boks_id = '';
+        }
+        if (!isSeksiPemerintahan.value) {
+            form.jenis_dokumen = 'umum';
+        }
+    },
+);
+
+watch(
+    () => form.jenis_dokumen,
+    (val) => {
+        if (!isDokumenKhusus.value) {
+            form.nama_pemilik = '';
+            form.nik_pemilik = '';
+            form.alamat_objek = '';
+            form.nomor_alas_hak = '';
+            form.keterangan_profiling = '';
+            form.lampiran = null;
         }
     },
 );
@@ -216,61 +288,70 @@ const submit = () => {
         <form class="space-y-4 px-6 py-5" @submit.prevent="submit">
             <div>
                 <InputLabel for="seksi_id" value="Seksi Penanggung Jawab *" />
-                <select
+                <AppSelect
                     id="seksi_id"
                     v-model="form.seksi_id"
-                    class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
+                    class="mt-1 block w-full"
+                    placeholder="Pilih seksi"
+                    label="Seksi penanggung jawab"
                     required
-                >
-                    <option
-                        v-for="seksi in resolvedSeksiList"
-                        :key="seksi.id"
-                        :value="seksi.id"
-                        :disabled="isSeksiOptionDisabled(seksi.id)"
-                    >
-                        {{ seksi.nama_seksi }}
-                    </option>
-                </select>
+                    :options="resolvedSeksiList.map((seksi) => ({
+                        value: seksi.id,
+                        label: seksi.nama_seksi,
+                        disabled: isSeksiOptionDisabled(seksi.id),
+                    }))"
+                />
                 <InputError class="mt-1" :message="form.errors.seksi_id" />
             </div>
 
             <div>
                 <InputLabel for="status_arsip" value="Status Dokumen" />
-                <select
+                <AppSelect
                     id="status_arsip"
                     v-model="form.status_arsip"
-                    class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
-                >
-                    <option value="tersedia">Tersedia</option>
-                    <option value="dipinjam">Dipinjam</option>
-                    <option value="hilang">Hilang</option>
-                </select>
+                    class="mt-1 block w-full"
+                    label="Status dokumen arsip"
+                    :options="[
+                        { value: 'tersedia', label: 'Tersedia' },
+                        { value: 'dipinjam', label: 'Dipinjam' },
+                        { value: 'hilang', label: 'Hilang' },
+                    ]"
+                />
                 <p class="mt-1 text-xs text-slate-500">Pilih "Hilang" bila dokumen belum ditemukan atau belum dikembalikan.</p>
                 <InputError class="mt-1" :message="form.errors.status_arsip" />
             </div>
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                    <InputLabel for="kode_arsip" value="Kode Arsip *" />
-                    <TextInput
+                    <div class="mb-1 flex items-center gap-1.5">
+                        <AppIcon :name="mode === 'edit' ? 'lock' : 'key'" class="h-4 w-4 text-slate-500" />
+                        <InputLabel for="kode_arsip" value="Kode Arsip" class="!mb-0" />
+                    </div>
+                    <input
                         id="kode_arsip"
-                        v-model="form.kode_arsip"
-                        class="mt-1 block w-full"
-                        placeholder="Contoh: PEM-001/2026 atau RKYT-002"
-                        required
+                        type="text"
+                        :value="mode === 'edit' ? form.kode_arsip : previewKodeArsip"
+                        readonly
+                        class="mt-1 block w-full rounded-lg border-slate-300 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 cursor-not-allowed"
                     />
-                    <InputError class="mt-1" :message="form.errors.kode_arsip" />
+                    <p class="mt-1 text-xs text-slate-400">
+                        {{ mode === 'edit'
+                            ? 'Nomor arsip bersifat permanen — akan berubah hanya jika seksi berpindah.'
+                            : 'Nomor dibuat otomatis oleh sistem setelah Seksi dipilih.' }}
+                    </p>
                 </div>
                 <div>
                     <InputLabel for="jenis_surat" value="Jenis Surat *" />
-                    <select
+                    <AppSelect
                         id="jenis_surat"
                         v-model="form.jenis_surat"
-                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
-                    >
-                        <option value="masuk">Surat Masuk</option>
-                        <option value="keluar">Surat Keluar</option>
-                    </select>
+                        class="mt-1 block w-full"
+                        label="Jenis surat arsip"
+                        :options="[
+                            { value: 'masuk', label: 'Surat Masuk' },
+                            { value: 'keluar', label: 'Surat Keluar' },
+                        ]"
+                    />
                     <InputError class="mt-1" :message="form.errors.jenis_surat" />
                 </div>
             </div>
@@ -303,16 +384,18 @@ const submit = () => {
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <InputLabel for="sifat_surat" value="Sifat Surat" />
-                    <select
+                    <AppSelect
                         id="sifat_surat"
                         v-model="form.sifat_surat"
-                        class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
-                    >
-                        <option value="biasa">Biasa</option>
-                        <option value="penting">Penting</option>
-                        <option value="segera">Segera</option>
-                        <option value="rahasia">Rahasia</option>
-                    </select>
+                        class="mt-1 block w-full"
+                        label="Sifat surat arsip"
+                        :options="[
+                            { value: 'biasa', label: 'Biasa' },
+                            { value: 'penting', label: 'Penting' },
+                            { value: 'segera', label: 'Segera' },
+                            { value: 'rahasia', label: 'Rahasia' },
+                        ]"
+                    />
                     <InputError class="mt-1" :message="form.errors.sifat_surat" />
                 </div>
                 <div v-if="form.jenis_surat === 'masuk'">
@@ -323,6 +406,7 @@ const submit = () => {
                         type="date"
                         class="mt-1 block w-full"
                     />
+                    <p class="mt-1 text-xs text-slate-400">Opsional — isi hanya jika tanggal diterima berbeda dari tanggal surat.</p>
                     <InputError class="mt-1" :message="form.errors.tanggal_diterima" />
                 </div>
             </div>
@@ -355,7 +439,7 @@ const submit = () => {
                     id="perihal"
                     v-model="form.perihal"
                     rows="3"
-                    class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm focus:border-brand-blue focus:ring-brand-blue"
+                    class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-brand-blue focus:ring-brand-blue"
                     placeholder="Contoh: Undangan Rapat Musrenbang atau Pengantar SKTM"
                     required
                 />
@@ -376,25 +460,37 @@ const submit = () => {
 
             <div>
                 <InputLabel for="rak_id" value="Rak Penyimpanan *" />
-                <select id="rak_id" v-model="form.rak_id" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm" required>
-                    <option value="" disabled>Pilih rak</option>
-                    <option v-for="rak in filteredRakList" :key="rak.id" :value="rak.id">
-                        {{ rak.kode_rak }} — No. {{ rak.nomor_rak || '—' }} · {{ rak.nama_rak }}
-                    </option>
-                </select>
+                <AppSelect
+                    id="rak_id"
+                    v-model="form.rak_id"
+                    class="mt-1 block w-full"
+                    placeholder="Pilih rak"
+                    label="Rak penyimpanan arsip"
+                    required
+                    :options="filteredRakList.map((rak) => ({
+                        value: rak.id,
+                        label: `${rak.kode_rak} — No. ${rak.nomor_rak || '—'} · ${rak.nama_rak}`,
+                    }))"
+                />
                 <p class="mt-1 text-xs text-slate-500">Hanya menampilkan rak milik seksi yang dipilih.</p>
                 <InputError class="mt-1" :message="form.errors.rak_id" />
             </div>
 
             <div>
                 <InputLabel for="boks_id" value="Boks Penyimpanan *" />
-                <select id="boks_id" v-model="form.boks_id" class="mt-1 block w-full rounded-lg border-slate-300 shadow-sm" required>
-                    <option value="" disabled>{{ form.rak_id ? 'Pilih boks' : 'Pilih rak terlebih dahulu' }}</option>
-                    <option v-for="boks in filteredBoksList" :key="boks.id" :value="boks.id">
-                        {{ boks.kode_boks }} — Baris {{ boks.nomor_baris || '—' }} · Boks {{ boks.nomor_boks || '—' }}
-                        (Terisi: {{ boks.dokumen_arsip_count ?? 0 }}/{{ boks.kapasitas ?? '—' }})
-                    </option>
-                </select>
+                <AppSelect
+                    id="boks_id"
+                    v-model="form.boks_id"
+                    class="mt-1 block w-full"
+                    :placeholder="form.rak_id ? 'Pilih boks' : 'Pilih rak terlebih dahulu'"
+                    label="Boks penyimpanan arsip"
+                    required
+                    :disabled="!form.rak_id"
+                    :options="filteredBoksList.map((boks) => ({
+                        value: boks.id,
+                        label: `${boks.kode_boks} — Baris ${boks.nomor_baris || '—'} · Boks ${boks.nomor_boks || '—'} (Terisi: ${boks.dokumen_arsip_count ?? 0}/${boks.kapasitas ?? '—'})`,
+                    }))"
+                />
                 <p v-if="!form.rak_id" class="mt-1 text-xs text-slate-500">Pilih rak terlebih dahulu untuk menampilkan boks yang tersedia.</p>
                 <InputError class="mt-1" :message="form.errors.boks_id" />
             </div>
@@ -410,12 +506,111 @@ const submit = () => {
                 <InputError class="mt-1" :message="form.errors.catatan" />
             </div>
 
+            <!-- Tahap 4: Klasifikasi Dokumen (khusus Seksi Pemerintahan) -->
+            <div v-if="isSeksiPemerintahan" class="rounded-xl border border-violet-200 bg-violet-50/50 p-4">
+                <div class="mb-1 flex items-center gap-1.5">
+                    <AppIcon name="file-text" class="h-4 w-4 text-violet-600" decorative />
+                    <InputLabel for="jenis_dokumen" value="Klasifikasi Dokumen" />
+                </div>
+                <AppSelect
+                    id="jenis_dokumen"
+                    v-model="form.jenis_dokumen"
+                    class="mt-1 block w-full"
+                    label="Klasifikasi dokumen"
+                    :options="[
+                        { value: 'umum', label: 'Dokumen Umum' },
+                        { value: 'surat_tanah', label: 'Surat Tanah' },
+                        { value: 'ahli_waris', label: 'Surat Ahli Waris' },
+                    ]"
+                />
+                <p v-if="isDokumenKhusus" class="mt-1.5 text-xs font-medium text-amber-700">
+                    Dokumen khusus — lampiran wajib berformat PDF.
+                </p>
+                <InputError class="mt-1" :message="form.errors.jenis_dokumen" />
+            </div>
+
+            <!-- Tahap 4: Panel Profiling / Biografi -->
+            <div v-if="isDokumenKhusus" class="rounded-xl border border-amber-200 bg-amber-50/60 p-4">
+                <div class="mb-3 flex items-center gap-1.5">
+                    <AppIcon name="key" class="h-4 w-4 text-amber-600" decorative />
+                    <h3 class="text-sm font-bold text-amber-900">Profiling / Biografi & Keterangan Tambahan</h3>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label for="nama_pemilik" class="block text-sm font-medium text-slate-700">
+                            Nama Pemilik / Pewaris <span class="text-red-500">*</span>
+                        </label>
+                        <input
+                            id="nama_pemilik"
+                            v-model="form.nama_pemilik"
+                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm"
+                            required
+                            placeholder="Nama lengkap pemilik tanah atau pewaris"
+                        />
+                        <InputError class="mt-1" :message="form.errors.nama_pemilik" />
+                    </div>
+
+                    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                            <InputLabel for="nik_pemilik" value="NIK Pemilik / Pewaris" />
+                            <input
+                                id="nik_pemilik"
+                                v-model="form.nik_pemilik"
+                                type="text"
+                                inputmode="numeric"
+                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm"
+                                placeholder="16 digit NIK (opsional)"
+                            />
+                            <InputError class="mt-1" :message="form.errors.nik_pemilik" />
+                        </div>
+                        <div>
+                            <InputLabel for="nomor_alas_hak" value="Nomor Alas Hak / Surat" />
+                            <input
+                                id="nomor_alas_hak"
+                                v-model="form.nomor_alas_hak"
+                                class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm"
+                                placeholder="Contoh: Girik No. 123, Sertifikat No. 456/2026"
+                            />
+                            <InputError class="mt-1" :message="form.errors.nomor_alas_hak" />
+                        </div>
+                    </div>
+
+                    <div>
+                        <InputLabel for="alamat_objek" value="Alamat / Lokasi Objek Tanah" />
+                        <textarea
+                            id="alamat_objek"
+                            v-model="form.alamat_objek"
+                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm"
+                            rows="2"
+                            placeholder="Alamat lengkap objek tanah atau keterangan domisili (opsional)"
+                        />
+                        <InputError class="mt-1" :message="form.errors.alamat_objek" />
+                    </div>
+
+                    <div>
+                        <InputLabel for="keterangan_profiling" value="Keterangan Tambahan / Riwayat Singkat" />
+                        <textarea
+                            id="keterangan_profiling"
+                            v-model="form.keterangan_profiling"
+                            class="mt-1 block w-full rounded-lg border-slate-300 text-sm shadow-sm"
+                            rows="2"
+                            placeholder="Catatan tambahan, riwayat singkat, atau profil pemilik (opsional)"
+                        />
+                        <InputError class="mt-1" :message="form.errors.keterangan_profiling" />
+                    </div>
+                </div>
+            </div>
+
             <div class="rounded-xl border border-dashed border-sky-200 bg-sky-50/60 p-4">
-                <InputLabel for="lampiran" value="Lampirkan File Scan (PDF / Foto Dokumen)" />
+                <InputLabel
+                    for="lampiran"
+                    :value="isDokumenKhusus ? 'Lampirkan File PDF (Wajib)' : 'Lampirkan File Scan (PDF / Foto Dokumen)'"
+                />
                 <input
                     id="lampiran"
                     type="file"
-                    accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/*"
+                    :accept="acceptLampiran"
                     class="mt-2 block w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-brand-blue file:px-3 file:py-2 file:text-sm file:font-semibold file:text-white"
                     @change="onFileChange"
                 />
@@ -425,11 +620,16 @@ const submit = () => {
                 <p v-else-if="existingFileUrl" class="mt-2 text-xs text-slate-600">
                     Lampiran saat ini:
                     <a :href="existingFileUrl" target="_blank" class="font-semibold text-brand-blue hover:underline">
-                        Lihat Lampiran
+                        {{ initialData?.is_encrypted ? 'Unduh PDF (Aman)' : 'Lihat Lampiran' }}
                     </a>
                 </p>
-                <p class="mt-2 text-xs text-slate-500">
-                    Maksimal 5 MB per file scan (PDF, JPG, JPEG, PNG).
+                <p class="mt-2 text-xs" :class="isDokumenKhusus ? 'text-amber-700 font-medium' : 'text-slate-500'">
+                    <template v-if="isDokumenKhusus">
+                        Dokumen khusus Surat Tanah / Ahli Waris wajib berformat PDF. Maksimal 5 MB.
+                    </template>
+                    <template v-else>
+                        Maksimal 5 MB per file scan (PDF, JPG, JPEG, PNG).
+                    </template>
                 </p>
                 <InputError class="mt-1" :message="form.errors.lampiran" />
             </div>

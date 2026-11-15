@@ -310,6 +310,7 @@ class RecordActivity
             'arsip.create',
             'arsip.edit',
             'arsip.export',
+            'arsip.file',
             'rak.index',
             'rak.store',
             'rak.update',
@@ -415,6 +416,11 @@ class RecordActivity
                 return 'Mengembalikan status arsip menjadi tersedia.';
             case 'arsip.tandahilang':
                 return 'Menandai dokumen arsip hilang.';
+            case 'arsip.retensi-tindakan':
+                $nama = $this->namaSeksi($seksiIdFromModel());
+                return $nama !== null
+                    ? "Menindaklanjuti retensi dokumen arsip di Seksi $nama."
+                    : 'Menindaklanjuti retensi dokumen arsip.';
             case 'arsip.scan':
                 return 'Pindai QR arsip.';
             case 'backup.export':
@@ -448,6 +454,8 @@ class RecordActivity
                 return 'Membuka form edit arsip.';
             case 'arsip.export':
                 return 'Mengekspor daftar arsip ke Excel.';
+            case 'arsip.file':
+                return 'Mengakses file lampiran dokumen.';
             case 'rak.index':
                 return 'Membuka daftar rak arsip.';
             case 'boks.index':

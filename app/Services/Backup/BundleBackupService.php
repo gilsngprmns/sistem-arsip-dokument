@@ -68,6 +68,10 @@ class BundleBackupService
                 ->map(function ($row) {
                     $data = Arr::except($row->toArray(), ['seksi', 'riwayat_sirkulasi', 'riwayatSirkulasi', 'pencatat']);
                     unset($data['id']);
+                    // Tahap 5 — pastikan metadata enkripsi ikut terback
+                    $data['is_encrypted'] = (bool) ($row->is_encrypted ?? false);
+                    $data['file_hash']    = $row->file_hash ?? null;
+                    $data['encrypted_at'] = $row->encrypted_at?->toIso8601String() ?? null;
 
                     // Id sumber disimpan di baris induk; riwayat tanpa id —
                     // kunci asing diganti saat import di sisi tujuan.
@@ -82,32 +86,88 @@ class BundleBackupService
     }
 
     /**
-     * Kumpulkan file fisik yang tercatat & benar-benar ada di storage publik.
+     * Kumpulkan file fisik yang tercatat & benar-benar ada di storage.
+     * Mencakup:
+     *  - file publik (disk 'public') untuk dokumen non-encrypted
+     *  - file terenkripsi (disk 'local', arsip-encrypted/) untuk dokumen is_encrypted
      *
-     * @return list<array{path: string, sha256: string, ukuran: int}>
+     * @return list<array{path: string, disk: string, sha256: string, ukuran: int}>
      */
     public function gatherFiles(): array
     {
-        $jalur = DokumenArsip::withTrashed()
-            ->whereNotNull('file_path')->pluck('file_path')
-            ->merge(DokumenArsip::withTrashed()->whereNotNull('qr_code_path')->pluck('qr_code_path'))
+        // File publik
+        $jalurPublik = DokumenArsip::withTrashed()
+            ->whereNotNull('file_path')
+            ->where('is_encrypted', false)
+            ->pluck('file_path')
             ->filter()
             ->unique()
             ->values();
 
-        return $jalur
+        $files = $jalurPublik
             ->filter(fn (string $p) => Storage::disk('public')->exists($p))
             ->map(function (string $p) {
-                $absolut = storage_path('app/public/'.$p);
+                // path() menghormati fake storage di test; storage_path() tidak
+                $absolut = Storage::disk('public')->path($p);
 
                 return [
-                    'path' => $p,
+                    'path'   => $p,
+                    'disk'   => 'public',
                     'sha256' => hash_file('sha256', $absolut),
-                    'ukuran' => File::size($absolut),
+                    'ukuran' => \Illuminate\Support\Facades\File::size($absolut),
                 ];
             })
             ->values()
             ->all();
+
+        // File QR code (disk publik, qrcodes/)
+        $jalurQr = DokumenArsip::withTrashed()
+            ->whereNotNull('qr_code_path')
+            ->pluck('qr_code_path')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $filesQr = $jalurQr
+            ->filter(fn (string $p) => Storage::disk('public')->exists($p))
+            ->map(function (string $p) {
+                $absolut = Storage::disk('public')->path($p);
+
+                return [
+                    'path'   => $p,
+                    'disk'   => 'public',
+                    'sha256' => hash_file('sha256', $absolut),
+                    'ukuran' => \Illuminate\Support\Facades\File::size($absolut),
+                ];
+            })
+            ->values()
+            ->all();
+
+        // File terenkripsi (disk local, direktori arsip-encrypted/)
+        $jalurEncrypted = DokumenArsip::withTrashed()
+            ->whereNotNull('file_path')
+            ->where('is_encrypted', true)
+            ->pluck('file_path')
+            ->filter()
+            ->unique()
+            ->values();
+
+        $filesEnc = $jalurEncrypted
+            ->filter(fn (string $p) => Storage::disk('local')->exists($p))
+            ->map(function (string $p) {
+                $absolut = Storage::disk('local')->path($p);
+
+                return [
+                    'path'   => $p,
+                    'disk'   => 'local',
+                    'sha256' => hash_file('sha256', $absolut),
+                    'ukuran' => \Illuminate\Support\Facades\File::size($absolut),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return array_merge($files, $filesQr, $filesEnc);
     }
 
     /**
@@ -175,7 +235,11 @@ class BundleBackupService
                 // recursive pada direktori yang sudah ada memicu E_WARNING
                 // "File exists", yang di artisan di-escalate jadi ErrorException.
                 File::ensureDirectoryExists(dirname($tujuan), 0755, true);
-                copy(storage_path('app/public/'.$entry['path']), $tujuan);
+
+                $diskSource = $entry['disk'] ?? 'public';
+                $sourcePath = Storage::disk($diskSource)->path($entry['path']);
+
+                copy($sourcePath, $tujuan);
             }
 
             $tmpZip = $staging.'/bundel.zip';
@@ -667,7 +731,8 @@ class BundleBackupService
                     }
 
                     try {
-                        Storage::disk('public')->put($entry['path'], file_get_contents($asal));
+                        $diskTarget = $entry['disk'] ?? 'public';
+                        Storage::disk($diskTarget)->put($entry['path'], file_get_contents($asal));
                         $statFile['disalin']++;
                     } catch (Throwable) {
                         $statFile['dilewati']++;

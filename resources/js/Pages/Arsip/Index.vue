@@ -1,6 +1,7 @@
 <script setup>
 import ArsipDetailModal from '@/Components/ArsipDetailModal.vue';
 import ArsipFormModal from '@/Components/ArsipFormModal.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import ArsipTable from '@/Components/ArsipTable.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
 import InputLabel from '@/Components/InputLabel.vue';
@@ -17,11 +18,16 @@ const props = defineProps({
         type: Object,
         required: true,
     },
+    retensiAlert: {
+        type: Number,
+        default: 0,
+    },
     filters: {
         type: Object,
         default: () => ({
             seksi_id: null,
             status: 'semua',
+            status_retensi: 'semua',
             q: '',
             tanggal_dari: '',
             tanggal_sampai: '',
@@ -48,6 +54,7 @@ const mySeksiId = computed(() => {
     const u = page.props.auth?.user;
     return u?.role !== 'admin' ? Number(u.seksi_id) : null;
 });
+const isAdmin = computed(() => page.props.auth?.user?.role === 'admin');
 const isSeksiOptionDisabled = (id) => mySeksiId.value !== null && Number(id) !== mySeksiId.value;
 
 watch(
@@ -88,6 +95,9 @@ watch(
 const localFilters = ref({
     seksi_id: props.filters.seksi_id ?? '',
     status: props.filters.status ?? 'semua',
+    status_retensi: props.filters.status_retensi ?? 'semua',
+    jenis_dokumen: props.filters.jenis_dokumen ?? 'semua',
+    status_pengecekan: props.filters.status_pengecekan ?? 'semua',
     q: props.filters.q ?? '',
     tanggal_dari: props.filters.tanggal_dari ?? '',
     tanggal_sampai: props.filters.tanggal_sampai ?? '',
@@ -105,6 +115,9 @@ watch(
         localFilters.value = {
             seksi_id: value.seksi_id ?? '',
             status: value.status ?? 'semua',
+            status_retensi: value.status_retensi ?? 'semua',
+            jenis_dokumen: value.jenis_dokumen ?? 'semua',
+            status_pengecekan: value.status_pengecekan ?? 'semua',
             q: value.q ?? '',
             tanggal_dari: value.tanggal_dari ?? '',
             tanggal_sampai: value.tanggal_sampai ?? '',
@@ -200,6 +213,9 @@ const applyFilters = () => {
         {
             seksi_id: localFilters.value.seksi_id || undefined,
             status: localFilters.value.status !== 'semua' ? localFilters.value.status : undefined,
+            status_retensi: localFilters.value.status_retensi !== 'semua' ? localFilters.value.status_retensi : undefined,
+            jenis_dokumen: localFilters.value.jenis_dokumen !== 'semua' ? localFilters.value.jenis_dokumen : undefined,
+            status_pengecekan: localFilters.value.status_pengecekan !== 'semua' ? localFilters.value.status_pengecekan : undefined,
             q: localFilters.value.q || undefined,
             tanggal_dari: localFilters.value.tanggal_dari || undefined,
             tanggal_sampai: localFilters.value.tanggal_sampai || undefined,
@@ -347,6 +363,9 @@ const exportExcel = () => {
     if (localFilters.value.status && localFilters.value.status !== 'semua') {
         params.set('status', localFilters.value.status);
     }
+    if (localFilters.value.status_retensi && localFilters.value.status_retensi !== 'semua') {
+        params.set('status_retensi', localFilters.value.status_retensi);
+    }
     if (localFilters.value.q) params.set('q', localFilters.value.q);
     if (localFilters.value.tanggal_dari) params.set('tanggal_dari', localFilters.value.tanggal_dari);
     if (localFilters.value.tanggal_sampai) params.set('tanggal_sampai', localFilters.value.tanggal_sampai);
@@ -409,6 +428,9 @@ const selectAll = async (ids) => {
             if (localFilters.value.seksi_id) params.set('seksi_id', localFilters.value.seksi_id);
             if (localFilters.value.status && localFilters.value.status !== 'semua') {
                 params.set('status', localFilters.value.status);
+            }
+            if (localFilters.value.status_retensi && localFilters.value.status_retensi !== 'semua') {
+                params.set('status_retensi', localFilters.value.status_retensi);
             }
             if (localFilters.value.q) params.set('q', localFilters.value.q);
             if (localFilters.value.tanggal_dari) params.set('tanggal_dari', localFilters.value.tanggal_dari);
@@ -489,7 +511,7 @@ onUnmounted(() => {
         </template>
 
         <template #skeleton>
-            <div class="mb-4 h-20 rounded-2xl bg-slate-100" />
+            <div class="mb-4 h-28 rounded-2xl bg-slate-100" />
             <div class="h-64 rounded-2xl bg-slate-100">
                 <div class="h-9 border-b border-slate-100" />
                 <div v-for="i in 5" :key="'sk-' + i" class="h-12 border-b border-slate-100" />
@@ -508,11 +530,14 @@ onUnmounted(() => {
                     <button
                         v-if="selectedIds.length > 0"
                         type="button"
-                        class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-red-700 sm:flex-none"
+                        :class="[
+                            'inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-sm sm:flex-none',
+                            isAdmin ? 'bg-red-700 hover:bg-red-800' : 'bg-red-600 hover:bg-red-700',
+                        ]"
                         @click="bulkDelete"
                     >
                         <AppIcon name="trash" :size="16" :stroke-width="2" decorative />
-                        Hapus {{ selectedIds.length }} Terpilih
+                        {{ isAdmin ? `Hapus Permanen (${selectedIds.length})` : `Hapus ${selectedIds.length} Terpilih` }}
                     </button>
                     <button
                         type="button"
@@ -526,6 +551,17 @@ onUnmounted(() => {
                 </div>
             </div>
         </template>
+
+        <div
+            v-if="retensiAlert > 0"
+            class="mb-4 flex items-start gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3"
+        >
+            <AppIcon name="alert-triangle" :size="18" :stroke-width="1.8" class="mt-0.5 h-[18px] w-[18px] shrink-0 text-rose-500" decorative />
+            <div class="flex-1 text-sm text-rose-800">
+                <strong>{{ retensiAlert }} dokumen</strong> memiliki masa aktif retensi yang sudah berakhir atau akan berakhir dalam 30 hari.
+                Gunakan filter "Status Retensi" untuk menyaring dokumen tersebut, atau buka detail arsip untuk mengambil tindakan.
+            </div>
+        </div>
 
         <div
             v-if="flashSuccess && flashVisible"
@@ -542,8 +578,9 @@ onUnmounted(() => {
         </div>
 
         <div v-reveal class="mb-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div class="flex flex-col gap-3 lg:flex-row lg:items-center">
-                <div class="relative min-w-0 flex-1">
+            <!-- BARIS 1: Pencarian + Urutan + Filter operasional -->
+            <div class="flex w-full flex-col gap-2.5 md:flex-row md:items-center">
+                <div class="relative w-full min-w-0 md:flex-1">
                     <AppIcon
                         name="search"
                         :size="16"
@@ -562,70 +599,63 @@ onUnmounted(() => {
                     />
                 </div>
 
-                <div class="flex flex-wrap items-center gap-2">
-                    <select
-                        v-model="localFilters.status"
-                        class="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 pl-3 pr-9 text-[13px] shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30"
+                <div class="flex items-center gap-2.5">
+                    <div class="w-full shrink-0 md:w-44">
+                        <AppSelect
+                        v-model="localFilters.sort"
+                        size="sm"
+                        label="Urutkan arsip"
+                        :options="[
+                            { value: 'terbaru', label: 'Terbaru' },
+                            { value: 'terlama', label: 'Terlama' },
+                            { value: 'kode', label: 'Kode' },
+                            { value: 'batas', label: 'Batas kembali' },
+                        ]"
                         @change="applyFilters"
-                    >
-                        <option value="semua">Semua Status</option>
-                        <option value="tersedia">Tersedia</option>
-                        <option value="dipinjam">Dipinjam</option>
-                        <option value="hilang">Hilang</option>
-                    </select>
-
-                    <div class="flex items-center gap-1 w-full sm:w-auto">
-                        <input
-                            v-model="localFilters.tanggal_dari"
-                            type="date"
-                            class="h-10 flex-1 min-w-0 rounded-lg border border-slate-300 px-2.5 text-[13px] shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30"
-                            @change="applyFilters"
-                        />
-                        <span class="text-xs font-medium text-slate-400">s/d</span>
-                        <input
-                            v-model="localFilters.tanggal_sampai"
-                            type="date"
-                            class="h-10 flex-1 min-w-0 rounded-lg border border-slate-300 px-2.5 text-[13px] shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30"
-                            @change="applyFilters"
-                        />
+                    />
                     </div>
 
-                    <select
-                        v-model="localFilters.sort"
-                        class="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 pl-3 pr-9 text-[13px] shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30"
-                        @change="applyFilters"
-                    >
-                        <option value="terbaru">Terbaru</option>
-                        <option value="terlama">Terlama</option>
-                        <option value="kode">Kode</option>
-                        <option value="batas">Batas kembali</option>
-                    </select>
-
-                    <div class="relative shrink-0 sm:flex-shrink">
+                    <div class="relative min-w-0 flex-1 md:shrink-0 md:flex-none">
                         <button
                             type="button"
-                            class="inline-flex h-10 items-center gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30"
-                            :class="hasOperationalFilter ? 'border-amber-300 bg-amber-50 text-amber-800' : ''"
+                            class="inline-flex h-10 w-full items-center justify-between gap-1.5 whitespace-nowrap rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:border-brand-blue focus-visible:ring-2 focus-visible:ring-brand-blue/30 md:w-auto md:justify-center"
+                            :class="hasOperationalFilter ? 'border-brand-blue bg-brand-blue/5 text-brand-blue' : ''"
                             @click="opFilterOpen = !opFilterOpen"
                         >
                             <AppIcon name="filter" :size="16" :stroke-width="1.8" class="h-4 w-4" decorative />
                             Filter operasional
                             <span
                                 v-if="activeOperationalCount > 0"
-                                class="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-amber-100 px-1.5 text-xs font-bold text-amber-800"
+                                class="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-brand-blue/10 px-1.5 text-xs font-bold text-brand-blue"
                             >
                                 {{ activeOperationalCount }}
                             </span>
-                            <AppIcon name="chevron-down" :size="16" :stroke-width="2" class="ml-1 h-4 w-4 shrink-0 text-slate-400" decorative />
+                            <AppIcon
+                                name="chevron-down"
+                                :size="16"
+                                :stroke-width="2"
+                                class="ml-1 h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200"
+                                :class="{ 'rotate-180': opFilterOpen }"
+                                decorative
+                            />
                         </button>
 
-                        <template v-if="opFilterOpen">
+                        <div
+                            v-show="opFilterOpen"
+                            class="fixed inset-0 z-40"
+                            @click="opFilterOpen = false"
+                        ></div>
+                        <Transition
+                            enter-active-class="transition ease-out duration-150"
+                            enter-from-class="opacity-0 scale-95"
+                            enter-to-class="opacity-100 scale-100"
+                            leave-active-class="transition ease-in duration-100"
+                            leave-from-class="opacity-100 scale-100"
+                            leave-to-class="opacity-0 scale-95"
+                        >
                             <div
-                                class="fixed inset-0 z-40"
-                                @click="opFilterOpen = false"
-                            ></div>
-                            <div
-                                class="absolute left-0 right-0 sm:left-auto sm:right-0 z-50 mt-2 w-full sm:w-56 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
+                                v-if="opFilterOpen"
+                                class="absolute right-0 left-0 z-50 mt-1.5 w-full sm:left-auto sm:right-0 sm:w-60 rounded-xl border border-slate-200 bg-white p-2 shadow-lg"
                             >
                                 <p class="px-2 py-1 text-xs font-semibold text-slate-500">Pilih filter (bisa lebih dari satu)</p>
                                 <label
@@ -641,28 +671,96 @@ onUnmounted(() => {
                                     />
                                     {{ item.label }}
                                 </label>
-                                <div v-if="hasOperationalFilter" class="border-t border-slate-100 pt-1">
-                                    <button
-                                        type="button"
-                                        class="w-full rounded-lg px-2 py-1.5 text-left text-sm font-medium text-slate-600 hover:bg-slate-50"
-                                        @click="
-                                            localFilters.tanpa_lokasi = false;
-                                            localFilters.terlambat = false;
-                                            localFilters.tanpa_file = false;
-                                            localFilters.metadata_kosong = false;
-                                            localFilters.tanpa_qr = false;
-                                            applyFilters();
-                                            opFilterOpen = false;
-                                        "
-                                    >
-                                        Hapus semua filter operasional
-                                    </button>
-                                </div>
                             </div>
-                        </template>
+                        </Transition>
                     </div>
                 </div>
             </div>
+            <!-- BARIS 2: dropdown filter + date range -->
+            <div class="mt-3 grid w-full grid-cols-1 items-center gap-2.5 border-t border-slate-100 pt-3 sm:grid-cols-2 lg:grid-cols-12">
+                <!-- Filter Status -->
+                <div class="w-full min-w-0 lg:col-span-2">
+                    <AppSelect
+                        v-model="localFilters.status"
+                        size="sm"
+                        label="Filter status arsip"
+                        :options="[
+                            { value: 'semua', label: 'Semua Status' },
+                            { value: 'tersedia', label: 'Tersedia' },
+                            { value: 'dipinjam', label: 'Dipinjam' },
+                            { value: 'hilang', label: 'Hilang' },
+                        ]"
+                        @change="applyFilters"
+                    />
+                </div>
+
+                <!-- Filter Status Retensi -->
+                <div class="w-full min-w-0 lg:col-span-2">
+                    <AppSelect
+                        v-model="localFilters.status_retensi"
+                        size="sm"
+                        label="Filter status retensi"
+                        :options="[
+                            { value: 'semua', label: 'Semua Retensi' },
+                            { value: 'aman', label: 'Retensi Aman' },
+                            { value: 'akan_kedaluwarsa', label: 'Akan Kedaluwarsa (30h)' },
+                            { value: 'kedaluwarsa', label: 'Kedaluwarsa' },
+                        ]"
+                        @change="applyFilters"
+                    />
+                </div>
+
+                <!-- Filter Klasifikasi Dokumen -->
+                <div class="w-full min-w-0 lg:col-span-2">
+                    <AppSelect
+                        v-model="localFilters.jenis_dokumen"
+                        size="sm"
+                        label="Filter klasifikasi dokumen"
+                        :options="[
+                            { value: 'semua', label: 'Semua Klasifikasi' },
+                            { value: 'umum', label: 'Dokumen Umum' },
+                            { value: 'surat_tanah', label: 'Surat Tanah' },
+                            { value: 'ahli_waris', label: 'Ahli Waris' },
+                        ]"
+                        @change="applyFilters"
+                    />
+                </div>
+
+                <!-- Filter Status Pengecekan -->
+                <div class="w-full min-w-0 lg:col-span-2">
+                    <AppSelect
+                        v-model="localFilters.status_pengecekan"
+                        size="sm"
+                        label="Filter status pengecekan"
+                        :options="[
+                            { value: 'semua', label: 'Semua Pengecekan' },
+                            { value: 'belum_dicek', label: 'Belum Dicek' },
+                            { value: 'dalam_pengecekan', label: 'Dalam Pengecekan' },
+                            { value: 'terverifikasi', label: 'Terverifikasi' },
+                            { value: 'perlu_perbaikan', label: 'Perlu Perbaikan' },
+                        ]"
+                        @change="applyFilters"
+                    />
+                </div>
+
+                <!-- Date range (span-4 di lg karena berisi 2 input + label; w-full di sm:col-span-2) -->
+                <div class="flex w-full min-w-0 items-center gap-1.5 sm:col-span-2 sm:gap-2 lg:col-span-4">
+                    <input
+                        v-model="localFilters.tanggal_dari"
+                        type="date"
+                        class="h-10 w-full flex-1 min-w-0 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 sm:px-3 sm:text-sm"
+                        @change="applyFilters"
+                    />
+                    <span class="shrink-0 text-xs text-slate-400">s/d</span>
+                    <input
+                        v-model="localFilters.tanggal_sampai"
+                        type="date"
+                        class="h-10 w-full flex-1 min-w-0 rounded-lg border border-slate-300 px-2.5 text-xs shadow-sm focus:border-brand-blue focus:ring-2 focus:ring-brand-blue/30 sm:px-3 sm:text-sm"
+                        @change="applyFilters"
+                    />
+                </div>
+            </div>
+
             <p class="mt-2 text-xs text-slate-400">Tekan / untuk fokus ke pencarian</p>
             <div v-if="hasOperationalFilter" class="mt-3 flex flex-wrap items-center gap-2">
                 <span class="text-xs font-semibold text-slate-500">Filter operasional:</span>
@@ -676,6 +774,21 @@ onUnmounted(() => {
                 >
                     {{ chip.label }}
                     <span aria-hidden="true">×</span>
+                </button>
+                <button
+                    v-if="activeOperationalCount > 1"
+                    type="button"
+                    class="text-xs font-medium text-rose-600 hover:text-rose-700 hover:underline"
+                    @click="
+                        localFilters.tanpa_lokasi = false;
+                        localFilters.terlambat = false;
+                        localFilters.tanpa_file = false;
+                        localFilters.metadata_kosong = false;
+                        localFilters.tanpa_qr = false;
+                        applyFilters();
+                    "
+                >
+                    Reset semua
                 </button>
             </div>
         </div>
@@ -736,18 +849,22 @@ onUnmounted(() => {
 
     <ConfirmModal
         :show="showDeleteModal"
-        title="Hapus Dokumen"
-        :message="`Dokumen ${deleteTarget?.kode_arsip ?? ''} akan dihapus dan dipindahkan ke daftar terhapus. Untuk memulihkan, hubungi admin.`"
-        confirm-label="Hapus"
+        :title="isAdmin ? 'Hapus Permanen' : 'Hapus Dokumen'"
+        :message="isAdmin
+            ? `Dokumen ${deleteTarget?.kode_arsip ?? ''} akan dihapus permanen dari database. Nomor arsip ini akan dapat dipakai ulang. Tindakan ini tidak dapat dibatalkan.`
+            : `Dokumen ${deleteTarget?.kode_arsip ?? ''} akan dihapus dan dipindahkan ke daftar terhapus. Untuk memulihkan, hubungi admin.`"
+        :confirm-label="isAdmin ? 'Hapus Permanen' : 'Hapus'"
         @close="showDeleteModal = false"
         @confirm="confirmDeleteArsip"
     />
 
     <ConfirmModal
         :show="showBulkDeleteModal"
-        title="Hapus Massal"
-        :message="`Apakah Anda yakin ingin menghapus ${selectedIds.length} arsip yang dipilih? Tindakan ini tidak dapat dibatalkan.`"
-        confirm-label="Hapus"
+        :title="isAdmin ? 'Hapus Massal Permanen' : 'Hapus Massal'"
+        :message="isAdmin
+            ? `Apakah Anda yakin ingin menghapus ${selectedIds.length} arsip secara permanen dari database? Nomor arsip akan dapat dipakai ulang. Tindakan ini tidak dapat dibatalkan.`
+            : `Apakah Anda yakin ingin menghapus ${selectedIds.length} arsip yang dipilih? Tindakan ini tidak dapat dibatalkan.`"
+        :confirm-label="isAdmin ? 'Hapus Permanen' : 'Hapus'"
         @close="showBulkDeleteModal = false"
         @confirm="confirmBulkDelete"
     />

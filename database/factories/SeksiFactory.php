@@ -20,7 +20,8 @@ class SeksiFactory extends Factory
     public function definition(): array
     {
         return [
-            'nama_seksi' => fake()->word(),
+            'kode_seksi' => strtoupper(fake()->unique()->bothify('SEK-####')),
+            'nama_seksi' => fake()->unique()->words(3, ' '),
         ];
     }
 }

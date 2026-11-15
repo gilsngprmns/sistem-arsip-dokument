@@ -16,8 +16,8 @@ class SeksiAccessTest extends TestCase
 
     private function createStaf(string $seksiNama, ?int $seksiId = null): array
     {
-        $seksiA = Seksi::create(['nama_seksi' => 'Pemerintahan']);
-        $seksiB = Seksi::create(['nama_seksi' => 'Ekonomi dan Pembangunan']);
+        $seksiA = Seksi::create(['kode_seksi' => 'PEM', 'nama_seksi' => 'Pemerintahan']);
+        $seksiB = Seksi::create(['kode_seksi' => 'EKB', 'nama_seksi' => 'Ekonomi dan Pembangunan']);
 
         $target = $seksiId ? $seksiId : $seksiA->id;
         $staf = User::factory()->create([

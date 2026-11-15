@@ -57,6 +57,39 @@ const seksiCode = computed(() => {
     if (nama.includes('kesejahteraan')) return 'SEKSI KSR';
     return 'SEKSI';
 });
+
+// Tahap 5: file terenkripsi → endpoint terkontrol; publik → /storage/
+const fileUrl = computed(() => {
+    if (!props.arsip?.file_path) return null;
+    return props.arsip.is_encrypted
+        ? route('arsip.file', props.arsip.id)
+        : `/storage/${props.arsip.file_path}`;
+});
+
+// Tahap 6: badge retensi ringan
+const retensiBadge = computed(() => {
+    const a = props.arsip;
+    if (!a) return null;
+    if (a.retensi_dipertahankan) {
+        return { label: 'Retensi Dipertahankan', cls: 'bg-blue-50 text-blue-800 ring-blue-300' };
+    }
+    if (a.is_kedaluwarsa) {
+        return { label: 'Retensi Kedaluwarsa', cls: 'bg-rose-50 text-rose-800 ring-rose-300' };
+    }
+    if (a.is_akan_kedaluwarsa) {
+        return { label: 'Akan Kedaluwarsa', cls: 'bg-amber-50 text-amber-800 ring-amber-300' };
+    }
+    if (a.retensi_kategori === 'permanen') {
+        return { label: 'Permanen', cls: 'bg-sky-50 text-sky-800 ring-sky-300' };
+    }
+    if (a.retensi_kategori) {
+        const label = a.retensi_kategori === 'kustom'
+            ? `Retensi ${a.retensi_tahun ?? ''} thn`
+            : 'Retensi Ringan';
+        return { label, cls: 'bg-emerald-50 text-emerald-800 ring-emerald-300' };
+    }
+    return null;
+});
 </script>
 
 <template>
@@ -76,6 +109,14 @@ const seksiCode = computed(() => {
                             >
                                 <span class="h-2 w-2 rounded-full" :class="statusBadge.dot" />
                                 {{ statusBadge.label }}
+                            </span>
+                            <span
+                                v-if="retensiBadge"
+                                class="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ring-1 ring-inset"
+                                :class="retensiBadge.cls"
+                            >
+                                <AppIcon name="clock" :size="12" :stroke-width="1.8" decorative />
+                                {{ retensiBadge.label }}
                             </span>
                         </div>
                         <p class="mt-1 font-medium text-slate-600">{{ arsip.kode_arsip }}</p>
@@ -120,11 +161,12 @@ const seksiCode = computed(() => {
                         class="flex min-h-28 items-center justify-center rounded-xl bg-slate-100 text-center"
                     >
                         <a
-                            :href="`/storage/${arsip.file_path}`"
+                            :href="fileUrl"
                             target="_blank"
                             class="inline-flex items-center gap-2 rounded-xl bg-brand-blue px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
                         >
-                            Lihat Lampiran
+                            <AppIcon v-if="arsip.is_encrypted" name="shield" :size="14" :stroke-width="2" decorative />
+                            {{ arsip.is_encrypted ? 'Unduh PDF (Aman)' : 'Lihat Lampiran' }}
                         </a>
                     </div>
                     <div

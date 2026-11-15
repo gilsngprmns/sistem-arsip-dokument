@@ -34,6 +34,10 @@ class DocumentExport extends BaseExcelExport
             'STATUS ARSIP',
             'CATATAN',
             'FILE DIGITAL',
+            // Kolom tersembunyi (O, P) — dipakai afterSheetCustom untuk
+            // mengarahkan hyperlink ke route aman; disembunyikan di sheet.
+            '',
+            '',
         ];
     }
 
@@ -54,6 +58,9 @@ class DocumentExport extends BaseExcelExport
             $document->status_arsip,
             $document->catatan,
             $document->file_path,
+            // Kolom tersembunyi O, P — id & flag enkripsi untuk hyperlink aman
+            $document->id,
+            $document->is_encrypted ? 1 : 0,
         ];
     }
 
@@ -63,6 +70,13 @@ class DocumentExport extends BaseExcelExport
         $col = 'N';
         $lastRow = $sheet->getHighestDataRow();
 
+        // Baris 2 = dokumen pertama; simpan id + is_encrypted di sel tersembunyi
+        // agar hyperlink bisa mengarah ke route aman, bukan /storage/ publik.
+        $colId   = 'O'; // kolom O untuk id dokumen
+        $colEnc  = 'P'; // kolom P untuk flag is_encrypted
+        $sheet->getColumnDimension($colId)->setVisible(false);
+        $sheet->getColumnDimension($colEnc)->setVisible(false);
+
         for ($row = 2; $row <= $lastRow; $row++) {
             $cell = $col.$row;
             $value = $sheet->getCell($cell)->getValue();
@@ -70,8 +84,15 @@ class DocumentExport extends BaseExcelExport
             if (is_string($value) && $value !== '') {
                 $sheet->getCell($cell)->setValue(basename($value));
 
+                $docId  = $sheet->getCell($colId.$row)->getValue();
+                $isEnc  = (bool) $sheet->getCell($colEnc.$row)->getValue();
+
+                $url = $isEnc
+                    ? route('arsip.file', ['arsip' => $docId])
+                    : url('/storage/'.$value);
+
                 $sheet->getCell($cell)->getHyperlink()
-                    ->setUrl(url('/storage/'.$value));
+                    ->setUrl($url);
 
                 $font = $sheet->getStyle($cell)->getFont();
                 $font->getColor()->setARGB('FF0000FF');

@@ -19,7 +19,7 @@ class ArchivePositionTest extends TestCase
     {
         Storage::fake('public');
 
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $user = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
         $rak = RakArsip::create([
             'seksi_id' => $seksi->id,
@@ -54,7 +54,7 @@ class ArchivePositionTest extends TestCase
         $response->assertSessionHasNoErrors()->assertRedirect('/arsip');
 
         $this->assertDatabaseHas('dokumen_arsip', [
-            'kode_arsip' => 'ARSIP-001',
+            'kode_arsip' => 'ARS-PLY-0001',
             'rak_id' => $rak->id,
             'boks_id' => $boks->id,
         ]);
@@ -66,8 +66,8 @@ class ArchivePositionTest extends TestCase
     {
         Storage::fake('public');
 
-        $seksiA = Seksi::create(['nama_seksi' => 'Pemerintahan']);
-        $seksiB = Seksi::create(['nama_seksi' => 'Kesejahteraan Rakyat']);
+        $seksiA = Seksi::create(['kode_seksi' => 'PEM', 'nama_seksi' => 'Pemerintahan']);
+        $seksiB = Seksi::create(['kode_seksi' => 'KSR', 'nama_seksi' => 'Kesejahteraan Rakyat']);
         $user = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksiA->id]);
         $rakB = RakArsip::create([
             'seksi_id' => $seksiB->id,
@@ -102,7 +102,7 @@ class ArchivePositionTest extends TestCase
     {
         Storage::fake('public');
 
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $user = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
         $rakA = RakArsip::create([
             'seksi_id' => $seksi->id,

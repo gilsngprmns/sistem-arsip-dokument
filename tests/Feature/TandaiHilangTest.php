@@ -17,7 +17,7 @@ class TandaiHilangTest extends TestCase
 
     private function buatArsip(User $admin, string $status = 'tersedia'): DokumenArsip
     {
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $rak = RakArsip::create([
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-TEST',
@@ -95,12 +95,11 @@ class TandaiHilangTest extends TestCase
     public function test_store_menerima_status_arsip_valid(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $rak   = RakArsip::create(['seksi_id' => $seksi->id, 'kode_rak' => 'RAK-HILANG', 'nama_rak' => 'Rak Hilang', 'is_active' => true]);
         $boks  = BoksArsip::create(['rak_id' => $rak->id, 'kode_boks' => 'BOK-HILANG', 'kapasitas' => 10, 'is_active' => true]);
 
         $response = $this->actingAs($admin)->post(route('arsip.store'), [
-            'kode_arsip' => 'STORE-HILANG',
             'nomor_surat' => '1/TEST/2026',
             'perihal' => 'Dokumen uji store',
             'jenis_surat' => 'masuk',
@@ -113,16 +112,15 @@ class TandaiHilangTest extends TestCase
         ]);
 
         $response->assertRedirect();
-        $this->assertDatabaseHas('dokumen_arsip', ['kode_arsip' => 'STORE-HILANG', 'status_arsip' => 'hilang']);
+        $this->assertDatabaseHas('dokumen_arsip', ['status_arsip' => 'hilang', 'seksi_id' => $seksi->id]);
     }
 
     public function test_store_menolak_status_arsip_invalid(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
 
         $response = $this->actingAs($admin)->post(route('arsip.store'), [
-            'kode_arsip' => 'STORE-INVALID',
             'nomor_surat' => '2/TEST/2026',
             'perihal' => 'Dokumen uji store invalid',
             'jenis_surat' => 'masuk',
@@ -133,6 +131,6 @@ class TandaiHilangTest extends TestCase
         ]);
 
         $response->assertSessionHasErrors('status_arsip');
-        $this->assertDatabaseMissing('dokumen_arsip', ['kode_arsip' => 'STORE-INVALID']);
+        $this->assertDatabaseMissing('dokumen_arsip', ['perihal' => 'Dokumen uji store invalid']);
     }
 }

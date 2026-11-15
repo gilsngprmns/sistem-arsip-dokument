@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Models\DokumenArsip;
+use App\Models\Seksi;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -33,13 +35,9 @@ class UpdateArsipRequest extends FormRequest
     {
         $arsip = $this->route('arsip');
 
-        return [
-            'kode_arsip' => [
-                'required',
-                'string',
-                'max:50',
-                Rule::unique('dokumen_arsip', 'kode_arsip')->ignore($arsip),
-            ],
+        $isDokumenKhusus = in_array($this->input('jenis_dokumen', 'umum'), DokumenArsip::JENIS_DOKUMEN_KHUSUS, true);
+
+        $rules = [
             'nomor_surat' => ['required', 'string', 'max:150'],
             'perihal' => ['required', 'string', 'max:255'],
             'jenis_surat' => ['required', Rule::in(['masuk', 'keluar'])],
@@ -74,7 +72,6 @@ class UpdateArsipRequest extends FormRequest
                         $fail('Boks harus sesuai dengan rak yang dipilih.');
                         return;
                     }
-                    // Untuk update, hitung dokumen lain di boks ini (kecuali dokumen yang sedang diupdate)
                     $arsipId = (int) $this->route('arsip')->id;
                     $count = $boks->dokumenArsip()->where('dokumen_arsip.id', '!=', $arsipId)->count();
                     if ($boks->kapasitas !== null && $count + 1 > $boks->kapasitas) {
@@ -85,7 +82,52 @@ class UpdateArsipRequest extends FormRequest
             'keterangan_posisi' => ['nullable', 'string'],
             'catatan' => ['nullable', 'string'],
             'status_arsip' => ['nullable', Rule::in(['tersedia', 'dipinjam', 'hilang'])],
-            'lampiran' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+
+            // Tahap 4 — Klasifikasi dokumen
+            'jenis_dokumen' => ['nullable', Rule::in(['umum', 'surat_tanah', 'ahli_waris'])],
+
+            'nama_pemilik' => $isDokumenKhusus
+                ? ['required', 'string', 'max:150']
+                : ['nullable', 'string', 'max:150'],
+            'nik_pemilik' => ['nullable', 'string', 'max:20', 'regex:/^\d{0,20}$/'],
+            'alamat_objek' => ['nullable', 'string'],
+            'nomor_alas_hak' => ['nullable', 'string', 'max:150'],
+            'keterangan_profiling' => ['nullable', 'string'],
+
+            'status_pengecekan' => ['nullable', Rule::in(DokumenArsip::STATUS_PENGECEKAN)],
+
+            'lampiran' => $isDokumenKhusus
+                ? ['nullable', 'file', 'mimes:pdf', 'max:5120']
+                : ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
+
+            // Tahap 6 — Klasifikasi masa aktif & retensi arsip
+            'retensi_kategori' => ['nullable', Rule::in(DokumenArsip::RETENSI_KATEGORI)],
+            'retensi_tahun' => ['nullable', 'integer', 'min:1', 'max:100'],
         ];
+
+        return $rules;
+    }
+
+    public function withValidator($validator)
+    {
+        $validator->after(function ($validator) {
+            $jenis = $this->input('jenis_dokumen', 'umum');
+            $seksi = Seksi::find($this->input('seksi_id'));
+
+            if (in_array($jenis, DokumenArsip::JENIS_DOKUMEN_KHUSUS, true) && $seksi && ! $seksi->isPemerintahan()) {
+                $validator->errors()->add(
+                    'jenis_dokumen',
+                    'Klasifikasi Surat Tanah / Ahli Waris hanya tersedia untuk Seksi Pemerintahan.'
+                );
+            }
+
+            // Tahap 6: kategori kustom wajib memberi durasi tahun (1–100)
+            if ($this->input('retensi_kategori') === 'kustom' && $this->input('retensi_tahun') === null) {
+                $validator->errors()->add(
+                    'retensi_tahun',
+                    'Durasi retensi (tahun) wajib diisi untuk kategori Kustom.'
+                );
+            }
+        });
     }
 }

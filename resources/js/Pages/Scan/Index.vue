@@ -50,7 +50,7 @@ const onFound = (data) => {
         </template>
 
         <div v-reveal class="mx-auto max-w-2xl space-y-4">
-            <div class="grid grid-cols-2 rounded-xl bg-slate-100 p-1 text-sm font-medium">
+            <div class="grid grid-cols-1 sm:grid-cols-2 rounded-xl bg-slate-100 p-1 text-sm font-medium">
                 <button
                     type="button"
                     class="rounded-lg px-3 py-2 transition"

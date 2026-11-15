@@ -12,6 +12,7 @@ class Seksi extends Model
     protected $table = 'seksi';
 
     protected $fillable = [
+        'kode_seksi',
         'nama_seksi',
         'keterangan',
     ];
@@ -44,5 +45,14 @@ class Seksi extends Model
     public function rakArsip(): HasMany
     {
         return $this->hasMany(RakArsip::class);
+    }
+
+    /** Cek apakah seksi ini adalah Seksi Pemerintahan (berdasarkan kode atau nama). */
+    public function isPemerintahan(): bool
+    {
+        if ($this->kode_seksi === 'PEM') {
+            return true;
+        }
+        return str_contains($this->nama_seksi, 'Pemerintahan');
     }
 }

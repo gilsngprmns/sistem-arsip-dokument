@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppIcon from '@/Components/AppIcon.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
 import Modal from '@/Components/Modal.vue';
 import RakEditModal from '@/Components/RakEditModal.vue';
@@ -264,11 +265,14 @@ const inlineRakErrors = computed(() => {
             <div class="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <div>
                     <label class="mb-1 block text-sm font-medium text-slate-700">Seksi pemilik rak</label>
-                    <select v-model="rakForm.seksi_id" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm text-slate-700">
-                        <option v-for="seksi in props.seksiOptions" :key="seksi.id" :value="seksi.id">
-                            {{ seksi.nama_seksi }}
-                        </option>
-                    </select>
+                    <AppSelect
+                        v-model="rakForm.seksi_id"
+                        label="Seksi pemilik rak"
+                        :options="props.seksiOptions.map((seksi) => ({
+                            value: seksi.id,
+                            label: seksi.nama_seksi,
+                        }))"
+                    />
                     <p v-if="inlineRakErrors.seksi_id" class="mt-1 text-xs text-red-600">{{ inlineRakErrors.seksi_id }}</p>
                 </div>
 

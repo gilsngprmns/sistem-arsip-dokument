@@ -33,7 +33,7 @@ const menuItem =
 </script>
 
 <template>
-    <div class="inline-flex flex-nowrap items-center gap-1">
+    <div class="flex flex-wrap items-center gap-1">
         <button
             v-if="showView"
             type="button"

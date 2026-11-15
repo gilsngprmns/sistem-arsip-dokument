@@ -18,7 +18,7 @@ class DashboardOperationsTest extends TestCase
     public function test_dashboard_exposes_active_loans_and_notifications(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $rak = RakArsip::create([
             'seksi_id' => $seksi->id,
             'kode_rak' => 'RAK-001',
@@ -86,8 +86,8 @@ class DashboardOperationsTest extends TestCase
 
     public function test_staff_dashboard_is_scoped_with_operational_widgets(): void
     {
-        $seksiA = Seksi::create(['nama_seksi' => 'Pelayanan']);
-        $seksiB = Seksi::create(['nama_seksi' => 'Keuangan']);
+        $seksiA = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
+        $seksiB = Seksi::create(['kode_seksi' => 'KEU', 'nama_seksi' => 'Keuangan']);
         $staff = User::factory()->create([
             'role' => 'staf',
             'seksi_id' => $seksiA->id,
@@ -166,7 +166,7 @@ class DashboardOperationsTest extends TestCase
 
     public function test_arsip_index_supports_tanpa_lokasi_and_terlambat_filters(): void
     {
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $user = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
         $rak = RakArsip::create([
             'seksi_id' => $seksi->id,
@@ -241,7 +241,7 @@ class DashboardOperationsTest extends TestCase
     public function test_admin_boks_attention_shows_only_boks_above_80_percent(): void
     {
         $admin = User::factory()->create(['role' => 'admin']);
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
 
         // 85% of capacity = 17 / 20 → should appear in boks_perhatian
         $rackHigh = RakArsip::create([
@@ -315,7 +315,7 @@ class DashboardOperationsTest extends TestCase
 
     public function test_arsip_index_supports_data_health_filters(): void
     {
-        $seksi = Seksi::create(['nama_seksi' => 'Pelayanan']);
+        $seksi = Seksi::create(['kode_seksi' => 'PLY', 'nama_seksi' => 'Pelayanan']);
         $user = User::factory()->create(['role' => 'staf', 'seksi_id' => $seksi->id]);
 
         DokumenArsip::create([

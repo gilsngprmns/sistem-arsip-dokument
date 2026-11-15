@@ -24,7 +24,9 @@ useAutoLogout();
 const { count: stafOnlineCount } = useStafOnline();
 
 /* ============ Skeleton loading ====== */
-const SKELETON_MS = 1000;
+// Skeleton untuk panel kanan dan header. Sidebar tidak lagi ikut skeleton saat
+// navigasi antar-halaman (Fix #131) — sidebar tetap tampil utuh setelah first-load.
+const SKELETON_MS = 1500;
 const isLoading = ref(true);
 let skeletonTimer = null;
 
@@ -123,27 +125,46 @@ onUnmounted(() => {
 </script>
 
 <template>
-    <div class="flex h-screen overflow-hidden bg-[#EEF2F7]">
-        <div
-            v-if="mobileOpen"
-            class="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
-            @click="closeMobile"
-        />
+    <div class="flex h-screen overflow-hidden bg-[#EEF2F7] h-dvh">
+        <!-- Backdrop drawer mobile: fade halus -->
+        <Transition
+            enter-active-class="transition-opacity duration-200 ease-in-out"
+            leave-active-class="transition-opacity duration-200 ease-in-out"
+            enter-from-class="opacity-0"
+            leave-to-class="opacity-0"
+        >
+            <div
+                v-if="mobileOpen"
+                class="fixed inset-0 z-40 bg-slate-900/50 lg:hidden"
+                @click="closeMobile"
+            />
+        </Transition>
 
-        <!-- Mobile drawer -->
+        <!-- Mobile drawer: panel meluncur masuk/keluar dari kiri -->
         <div
             id="mobile-sidebar"
-            class="fixed inset-y-0 left-0 z-50 flex h-full w-[min(88vw,320px)] transform shadow-2xl transition duration-200 lg:hidden"
-            :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'"
+            class="pointer-events-none fixed inset-y-0 left-0 z-50 h-full w-0 lg:hidden"
         >
-            <Sidebar
-                sidebar-id="mobile-sidebar-panel"
-                :active-seksi-id="activeSeksiId"
-                :collapsed="false"
-                show-close
-                @close="closeMobile"
-                @navigate="closeMobile"
-            />
+            <Transition
+                enter-active-class="transform transition-transform duration-300 ease-out"
+                leave-active-class="transform transition-transform duration-200 ease-in"
+                enter-from-class="-translate-x-full"
+                leave-to-class="-translate-x-full"
+            >
+                <div
+                    v-if="mobileOpen"
+                    class="pointer-events-auto flex h-full w-[min(88vw,320px)] shadow-2xl"
+                >
+                    <Sidebar
+                        sidebar-id="mobile-sidebar-panel"
+                        :active-seksi-id="activeSeksiId"
+                        :collapsed="false"
+                        show-close
+                        @close="closeMobile"
+                        @navigate="closeMobile"
+                    />
+                </div>
+            </Transition>
         </div>
 
         <!-- Desktop sidebar: tetap di tempat, tidak ikut scroll -->
@@ -218,7 +239,7 @@ onUnmounted(() => {
                                 class="absolute inset-0 flex items-center justify-center gap-2 px-3"
                                 role="status"
                             >
-                                <p class="text-sm font-semibold text-brand-navy">
+                                <p class="text-sm font-semibold text-brand-navy whitespace-nowrap">
                                     Selamat datang, {{ page.props.auth?.user?.name ?? 'Rekan' }}!
                                 </p>
                                 <button

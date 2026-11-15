@@ -176,7 +176,7 @@ const runNow = () => {
             <div class="space-y-4">
                 <div class="h-24 rounded-2xl bg-slate-100 p-4">
                     <div class="h-5 w-40 rounded bg-slate-200" />
-                    <div class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                    <div class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
                         <div v-for="i in 4" :key="'sk-stat-' + i" class="h-12 rounded-xl bg-slate-200" />
                     </div>
                 </div>
@@ -258,7 +258,7 @@ const runNow = () => {
                 </span>
             </div>
 
-            <dl class="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <dl class="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
                 <div class="rounded-lg bg-slate-50 p-3">
                     <dt class="text-xs text-slate-500">Dibuat</dt>
                     <dd class="text-lg font-bold text-emerald-600">{{ backupResult.dibuat }}</dd>
@@ -390,7 +390,8 @@ const runNow = () => {
             <template v-else>
                 <p v-if="selectedIds.length === 0" class="mt-1 text-xs text-slate-400">Centang cadangan untuk menghapusnya.</p>
 
-                <table class="mt-4 w-full text-left text-sm">
+                <div class="overflow-x-auto">
+                    <table class="mt-4 w-full text-left text-sm">
                     <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
                         <tr>
                             <th class="py-2 w-10 text-center">
@@ -431,27 +432,6 @@ const runNow = () => {
                             </td>
                             <td class="py-2.5 pr-4 text-center text-slate-600">{{ formatUkur(b.ukuran_bytes) }}</td>
                             <td class="py-2.5 text-center" @click.stop>
-=======
-            <div v-else>
-                <table class="mt-4 w-full text-left text-sm">
-                    <thead class="border-b border-slate-200 text-xs uppercase text-slate-500">
-                        <tr>
-                            <th class="py-2 pr-4">File</th>
-                            <th class="py-2 pr-4">Waktu</th>
-                            <th class="py-2 pr-4">Isi</th>
-                            <th class="py-2 pr-4">Ukuran</th>
-                            <th class="py-2"></th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        <tr v-for="b in daftarBackup" :key="b.nama_file" class="hover:bg-slate-50">
-                            <td class="py-2.5 pr-4 font-mono text-xs">{{ b.nama_file }}</td>
-                            <td class="py-2.5 pr-4 text-slate-600">{{ formatWaktu(b.diambil_pada) }}</td>
-                            <td class="py-2.5 pr-4 text-slate-600">
-                                <span v-if="b.rincian">{{ b.rincian.dokumen_arsip ?? 0 }} arsip · {{ b.rincian.file_fisik ?? 0 }} file</span>
-                            </td>
-                            <td class="py-2.5 pr-4 text-slate-600">{{ formatUkur(b.ukuran_bytes) }}</td>
-                            <td class="py-2.5 text-right">
                                 <a
                                     :href="route('backup.files', b.nama_file)"
                                     class="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-blue hover:text-blue-700"
@@ -462,7 +442,8 @@ const runNow = () => {
                             </td>
                         </tr>
                     </tbody>
-                </table>
+                    </table>
+                </div>
 
                 <div v-if="adaLebihLama" class="mt-4 flex items-center justify-between">
                     <button

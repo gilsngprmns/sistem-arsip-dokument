@@ -1,6 +1,7 @@
 <script setup>
 import AppLayout from '@/Layouts/AppLayout.vue';
 import AppIcon from '@/Components/AppIcon.vue';
+import AppSelect from '@/Components/AppSelect.vue';
 import BoksEditModal from '@/Components/BoksEditModal.vue';
 import ConfirmModal from '@/Components/ConfirmModal.vue';
 import Modal from '@/Components/Modal.vue';
@@ -262,12 +263,16 @@ const openQrModal = (boks) => {
                 <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                         <label class="mb-1 block text-sm font-medium text-slate-700">Rak *</label>
-                        <select v-model="form.rak_id" class="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm">
-                            <option value="" disabled>Pilih rak</option>
-                            <option v-for="rak in rakList" :key="rak.id" :value="rak.id">
-                                {{ rak.kode_rak }} — {{ rak.nama_rak }}
-                            </option>
-                        </select>
+                        <AppSelect
+                            v-model="form.rak_id"
+                            placeholder="Pilih rak"
+                            label="Rak boks"
+                            required
+                            :options="rakList.map((rak) => ({
+                                value: rak.id,
+                                label: `${rak.kode_rak} — ${rak.nama_rak}`,
+                            }))"
+                        />
                         <p v-if="inlineErrors.rak_id" class="mt-1 text-xs text-red-600">{{ inlineErrors.rak_id }}</p>
                     </div>
 

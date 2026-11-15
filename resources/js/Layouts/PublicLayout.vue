@@ -106,7 +106,7 @@ const closeLogoLightbox = () => {
 
         <!-- Header asli -->
         <header v-else class="sticky top-0 z-50 bg-white/85 backdrop-blur-md shadow-sm border-b border-gray-100">
-            <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-6 py-4">
+            <div class="mx-auto flex w-full max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:gap-4 sm:px-6">
                 <div class="flex min-w-0 shrink-0 items-center gap-3">
                     <button
                         type="button"

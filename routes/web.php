@@ -142,6 +142,21 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
         'terlambat' => (clone $documentQuery)->where('status_arsip', 'dipinjam')->whereNotNull('batas_pengembalian')->where('batas_pengembalian', '<', now())->count(),
     ];
 
+    $retensiHariIni = now()->startOfDay();
+    $retensi = [
+        'kedaluwarsa' => (clone $documentQuery)
+            ->where('retensi_dipertahankan', false)
+            ->whereNotNull('tanggal_kedaluwarsa')
+            ->whereDate('tanggal_kedaluwarsa', '<', $retensiHariIni)
+            ->count(),
+        'akan_kedaluwarsa' => (clone $documentQuery)
+            ->where('retensi_dipertahankan', false)
+            ->whereNotNull('tanggal_kedaluwarsa')
+            ->whereDate('tanggal_kedaluwarsa', '>=', $retensiHariIni)
+            ->whereDate('tanggal_kedaluwarsa', '<=', $retensiHariIni->addDays(30))
+            ->count(),
+    ];
+
     if ($isAdmin) {
         $fullBoks = BoksArsip::query()
             ->where('is_active', true)
@@ -237,6 +252,7 @@ Route::get('/dashboard', function (\Illuminate\Http\Request $request) {
         'trendGranularity' => $trendGranularity,
         'trendPeriod' => $trendPeriod,
         'notifications' => $notifications,
+        'retensi' => $retensi,
         'adminOverview' => $adminOverview,
         'activeLoans' => $activeLoans,
         'dataHealth' => [
@@ -266,7 +282,13 @@ Route::get('/scan/boks/{kode_boks}', [BoksArsipController::class, 'showByKode'])
 
 Route::middleware(['auth', 'active'])->group(function () {
     Route::get('/scan', fn () => Inertia::render('Scan/Index'))->name('scan.index');
+    Route::get('arsip/next-number', [ArsipController::class, 'nextNumber'])->name('arsip.next-number');
     Route::get('arsip/export', [ArsipController::class, 'exportExcel'])->name('arsip.export');
+    Route::get('arsip/{arsip}/file', [ArsipController::class, 'downloadFile'])->name('arsip.file');
+    Route::get('arsip/{arsip}/print', [ArsipController::class, 'print'])->name('arsip.print');
+    Route::post('arsip/{arsip}/pengecekan', [ArsipController::class, 'pengecekan'])->name('arsip.pengecekan');
+    // Tahap 6 — tindakan retensi (pertahankan masa aktif)
+    Route::post('arsip/{arsip}/retensi-tindakan', [ArsipController::class, 'retensiTindakan'])->name('arsip.retensi-tindakan');
     Route::post('arsip/{arsip}/pinjam', [ArsipController::class, 'pinjam'])->name('arsip.pinjam');
     Route::post('arsip/{arsip}/kembalikan', [ArsipController::class, 'kembalikan'])->name('arsip.kembalikan');
     Route::post('arsip/{arsip}/settersedia', [ArsipController::class, 'settersedia'])->name('arsip.settersedia');
